@@ -1,4 +1,4 @@
-import type { ZoomKeyframe } from '@demoforge/core';
+import type { ReactNode } from 'react';
 import { useRef } from 'react';
 
 export type DragMode = 'move' | 'start' | 'end';
@@ -6,28 +6,46 @@ export type DragMode = 'move' | 'start' | 'end';
 /** Below this a pill cannot hold two handles and a draggable body. */
 const COMPACT_PX = 34;
 
+const TONES = {
+  zoom: {
+    on: 'border-sky-300 bg-sky-500/40 text-sky-50 ring-1 ring-sky-300/60',
+    off: 'border-sky-500/50 bg-sky-500/20 text-sky-200 hover:bg-sky-500/30',
+    grip: 'bg-sky-300/70',
+  },
+  caption: {
+    on: 'border-emerald-300 bg-emerald-500/40 text-emerald-50 ring-1 ring-emerald-300/60',
+    off: 'border-emerald-500/50 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30',
+    grip: 'bg-emerald-300/70',
+  },
+} as const;
+
 interface Props {
-  kf: ZoomKeyframe;
+  tone: keyof typeof TONES;
   leftPx: number;
   widthPx: number;
   pxPerMs: number;
   selected: boolean;
+  title: string;
+  label: ReactNode;
   onSelect: () => void;
   onDrag: (mode: DragMode, deltaMs: number) => void;
   onDragEnd: () => void;
 }
 
-export default function ZoomPill({
-  kf,
+export default function Pill({
+  tone,
   leftPx,
   widthPx,
   pxPerMs,
   selected,
+  title,
+  label,
   onSelect,
   onDrag,
   onDragEnd,
 }: Props) {
   const origin = useRef(0);
+  const t = TONES[tone];
 
   const begin = (mode: DragMode) => (e: React.PointerEvent) => {
     e.stopPropagation();
@@ -50,35 +68,27 @@ export default function ZoomPill({
     el.addEventListener('pointerup', up);
   };
 
-  const compact = widthPx < COMPACT_PX;
-
   return (
     <div
       onPointerDown={begin('move')}
       style={{ left: leftPx, width: Math.max(6, widthPx) }}
+      title={title}
       className={`absolute inset-y-1 flex cursor-grab items-center justify-between overflow-hidden rounded-md border text-[10px] font-medium select-none active:cursor-grabbing ${
-        selected
-          ? 'border-sky-300 bg-sky-500/40 text-sky-50 ring-1 ring-sky-300/60'
-          : 'border-sky-500/50 bg-sky-500/20 text-sky-200 hover:bg-sky-500/30'
+        selected ? t.on : t.off
       }`}
-      title={`${(kf.tStart / 1000).toFixed(2)}s – ${(kf.tEnd / 1000).toFixed(2)}s · ${kf.scale.toFixed(2)}×`}
     >
       <span
         onPointerDown={begin('start')}
-        className="h-full w-1.5 shrink-0 cursor-ew-resize bg-sky-300/70"
+        className={`h-full w-1.5 shrink-0 cursor-ew-resize ${t.grip}`}
       />
-      {!compact && (
-        <span className="pointer-events-none flex items-center gap-1 truncate px-1">
-          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <circle cx="11" cy="11" r="7" />
-            <path d="m20 20-3.5-3.5" />
-          </svg>
-          {kf.scale.toFixed(2)}×
+      {widthPx >= COMPACT_PX && (
+        <span className="pointer-events-none flex min-w-0 items-center gap-1 truncate px-1">
+          {label}
         </span>
       )}
       <span
         onPointerDown={begin('end')}
-        className="h-full w-1.5 shrink-0 cursor-ew-resize bg-sky-300/70"
+        className={`h-full w-1.5 shrink-0 cursor-ew-resize ${t.grip}`}
       />
     </div>
   );

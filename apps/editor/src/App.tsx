@@ -9,29 +9,43 @@ import Player from './player/Player.js';
 import Transport from './player/Transport.js';
 import { useProject } from './state/useProject.js';
 import { setTarget } from './timeline/kfOps.js';
-import Timeline from './timeline/Timeline.js';
+import Timeline, { type Selection } from './timeline/Timeline.js';
 
 const FRAME_MS = 1000 / 30;
 
 export default function App() {
-  const { project, keyframes, setKeyframes, style, setStyle, load, replan } = useProject();
+  const {
+    project,
+    keyframes,
+    setKeyframes,
+    captions,
+    setCaptions,
+    style,
+    setStyle,
+    load,
+    replan,
+    save,
+  } = useProject();
   const [timeMs, setTimeMs] = useState(0);
-  const [selected, setSelected] = useState<number | null>(null);
+  const [selection, setSelection] = useState<Selection>(null);
   const [zoomEnabled, setZoomEnabled] = useState(true);
-  // Bumped by the Z shortcut; the timeline owns where a new zoom actually goes.
-  const [addSignal, setAddSignal] = useState(0);
+  // Bumped by the Z / C shortcuts; the timeline decides where the new item goes.
+  const [addZoom, setAddZoom] = useState(0);
+  const [addCaption, setAddCaption] = useState(0);
 
   const active = useMemo(() => (zoomEnabled ? keyframes : []), [zoomEnabled, keyframes]);
-  // While aiming a zoom the preview shows the unzoomed frame, so the focus
-  // rectangle means "this is what will be visible" rather than sitting on top
-  // of an already-zoomed picture.
-  const aiming = selected !== null && selected < keyframes.length;
-  const preview = aiming ? [] : active;
 
   const video = project?.video;
   const duration = project?.rec.video.durationMs ?? 0;
   const seek = (ms: number): void => {
     if (video) video.currentTime = Math.min(Math.max(0, ms), duration) / 1000;
+  };
+
+  const deleteSelected = (): void => {
+    if (!selection) return;
+    if (selection.kind === 'zoom') setKeyframes(keyframes.filter((_, i) => i !== selection.index));
+    else setCaptions(captions.filter((_, i) => i !== selection.index));
+    setSelection(null);
   };
 
   useHotkeys(
@@ -41,45 +55,53 @@ export default function App() {
           if (!video) return;
           video.paused ? void video.play() : video.pause();
         },
-        z: () => setAddSignal((n) => n + 1),
+        z: () => setAddZoom((n) => n + 1),
+        c: () => setAddCaption((n) => n + 1),
+        s: () => save(),
         ArrowLeft: () => seek(timeMs - FRAME_MS),
         ArrowRight: () => seek(timeMs + FRAME_MS),
         'shift+ArrowLeft': () => seek(timeMs - 1000),
         'shift+ArrowRight': () => seek(timeMs + 1000),
         Home: () => seek(0),
         End: () => seek(duration),
-        Delete: () => {
-          if (selected === null) return;
-          setKeyframes(keyframes.filter((_, i) => i !== selected));
-          setSelected(null);
-        },
-        Backspace: () => {
-          if (selected === null) return;
-          setKeyframes(keyframes.filter((_, i) => i !== selected));
-          setSelected(null);
-        },
+        Escape: () => setSelection(null),
+        Delete: deleteSelected,
+        Backspace: deleteSelected,
       }),
       // eslint-disable-next-line react-hooks/exhaustive-deps
-      [video, timeMs, duration, selected, keyframes],
+      [video, timeMs, duration, selection, keyframes, captions, save],
     ),
   );
 
   if (!project) return <DropZone onLoad={load} />;
 
   const videoAspect = project.video.videoWidth / (project.video.videoHeight || 1);
+  const aimIndex =
+    selection?.kind === 'zoom' && selection.index < keyframes.length ? selection.index : null;
+  // While aiming a zoom the preview shows the unzoomed frame, so the focus
+  // rectangle means "this is what will be visible" rather than sitting on top
+  // of an already-zoomed picture.
+  const preview = aimIndex === null ? active : [];
 
   return (
     <div className="flex h-full flex-col bg-slate-950">
       <header className="flex items-center gap-3 border-b border-slate-800 px-4 py-2">
         <h1 className="text-sm font-semibold">DemoForge</h1>
         <span className="text-xs text-slate-500">
-          {project.rec.events.length} events · {keyframes.length} zooms ·{' '}
-          {project.video.videoWidth}×{project.video.videoHeight}
+          {project.rec.events.length} events · {keyframes.length} zooms · {captions.length}{' '}
+          captions
         </span>
         {project.warning && (
           <span className="truncate text-xs text-amber-400">{project.warning}</span>
         )}
-        <ExportDialog project={project} keyframes={active} style={style} />
+        <button
+          onClick={save}
+          title="Save project (S) — JSON you can edit by hand or with a script"
+          className="ml-auto rounded bg-slate-800 px-3 py-1 text-xs text-slate-200 hover:bg-slate-700"
+        >
+          Save project
+        </button>
+        <ExportDialog project={project} keyframes={active} captions={captions} style={style} />
       </header>
 
       <div className="flex min-h-0 flex-1">
@@ -87,35 +109,33 @@ export default function App() {
           <Player
             project={project}
             keyframes={preview}
+            captions={captions}
             style={style}
             onTime={setTimeMs}
             overlay={
-              aiming
-                ? ({ w, h }) => (
+              aimIndex === null
+                ? undefined
+                : ({ w, h }) => (
                     <FocusOverlay
-                      kf={keyframes[selected]!}
+                      kf={keyframes[aimIndex]!}
                       canvasW={w}
                       canvasH={h}
                       videoW={project.video.videoWidth}
                       videoH={project.video.videoHeight}
                       style={style}
-                      onPlace={(x, y) => setKeyframes(setTarget(keyframes, selected, x, y))}
+                      onPlace={(x, y) => setKeyframes(setTarget(keyframes, aimIndex, x, y))}
                     />
                   )
-                : undefined
             }
           />
-          {aiming && (
+          {aimIndex !== null && (
             <ZoomInspector
               rec={project.rec}
               keyframes={keyframes}
               setKeyframes={setKeyframes}
-              index={selected}
-              onClose={() => setSelected(null)}
-              onDelete={() => {
-                setKeyframes(keyframes.filter((_, i) => i !== selected));
-                setSelected(null);
-              }}
+              index={aimIndex}
+              onClose={() => setSelection(null)}
+              onDelete={deleteSelected}
             />
           )}
         </main>
@@ -125,12 +145,16 @@ export default function App() {
           setStyle={setStyle}
           keyframes={keyframes}
           setKeyframes={setKeyframes}
-          selected={selected}
+          captions={captions}
+          setCaptions={setCaptions}
+          selection={selection}
+          onSelect={setSelection}
+          timeMs={timeMs}
           zoomEnabled={zoomEnabled}
           setZoomEnabled={setZoomEnabled}
           onReplan={() => {
             replan();
-            setSelected(null);
+            setSelection(null);
           }}
           videoAspect={videoAspect}
         />
@@ -148,12 +172,15 @@ export default function App() {
           rec={project.rec}
           keyframes={keyframes}
           setKeyframes={setKeyframes}
+          captions={captions}
+          setCaptions={setCaptions}
           timeMs={timeMs}
           onSeek={seek}
-          selected={selected}
-          onSelect={setSelected}
+          selection={selection}
+          onSelect={setSelection}
           mediaName={project.mediaName}
-          addSignal={addSignal}
+          addZoomSignal={addZoom}
+          addCaptionSignal={addCaption}
         />
       </footer>
     </div>

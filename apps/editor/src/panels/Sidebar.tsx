@@ -1,18 +1,21 @@
 import { useState, type ReactNode } from 'react';
-import type { DemoRecording, ZoomKeyframe } from '@demoforge/core';
+import type { CaptionCue, DemoRecording, ZoomKeyframe } from '@demoforge/core';
 import type { FrameStyle } from '../render/style.js';
+import type { Selection } from '../timeline/Timeline.js';
 import BackgroundPanel from './BackgroundPanel.js';
+import CaptionsPanel from './CaptionsPanel.js';
 import CursorPanel from './CursorPanel.js';
 import EffectsPanel from './EffectsPanel.js';
 import LayoutPanel from './LayoutPanel.js';
 import ZoomPanel from './ZoomPanel.js';
-import { IconCursor, IconImage, IconLayout, IconSliders, IconZoom } from './icons.js';
+import { IconCaption, IconCursor, IconImage, IconLayout, IconSliders, IconZoom } from './icons.js';
 
-type PanelId = 'background' | 'zoom' | 'effects' | 'layout' | 'cursor';
+type PanelId = 'background' | 'zoom' | 'captions' | 'effects' | 'layout' | 'cursor';
 
 const TABS: Array<{ id: PanelId; title: string; icon: ReactNode }> = [
   { id: 'background', title: 'Background', icon: <IconImage /> },
   { id: 'zoom', title: 'Zoom', icon: <IconZoom /> },
+  { id: 'captions', title: 'Captions', icon: <IconCaption /> },
   { id: 'effects', title: 'Effects', icon: <IconSliders /> },
   { id: 'layout', title: 'Layout', icon: <IconLayout /> },
   { id: 'cursor', title: 'Cursor', icon: <IconCursor /> },
@@ -24,7 +27,11 @@ interface Props {
   setStyle: (s: FrameStyle) => void;
   keyframes: ZoomKeyframe[];
   setKeyframes: (kfs: ZoomKeyframe[]) => void;
-  selected: number | null;
+  captions: CaptionCue[];
+  setCaptions: (c: CaptionCue[]) => void;
+  selection: Selection;
+  onSelect: (s: Selection) => void;
+  timeMs: number;
   zoomEnabled: boolean;
   setZoomEnabled: (v: boolean) => void;
   onReplan: () => void;
@@ -34,6 +41,8 @@ interface Props {
 export default function Sidebar(p: Props) {
   const [open, setOpen] = useState<PanelId | null>('background');
   const active = TABS.find((t) => t.id === open);
+  const selZoom = p.selection?.kind === 'zoom' ? p.selection.index : null;
+  const selCaption = p.selection?.kind === 'caption' ? p.selection.index : null;
 
   return (
     <div className="flex min-h-0">
@@ -60,10 +69,22 @@ export default function Sidebar(p: Props) {
               <ZoomPanel
                 keyframes={p.keyframes}
                 setKeyframes={p.setKeyframes}
-                selected={p.selected}
+                selected={selZoom}
                 enabled={p.zoomEnabled}
                 setEnabled={p.setZoomEnabled}
                 onReplan={p.onReplan}
+              />
+            )}
+            {open === 'captions' && (
+              <CaptionsPanel
+                rec={p.rec}
+                captions={p.captions}
+                setCaptions={p.setCaptions}
+                selected={selCaption}
+                onSelect={(i) => p.onSelect(i === null ? null : { kind: 'caption', index: i })}
+                timeMs={p.timeMs}
+                style={p.style}
+                setStyle={p.setStyle}
               />
             )}
           </div>

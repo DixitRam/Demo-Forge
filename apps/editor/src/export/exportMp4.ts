@@ -16,7 +16,7 @@ import coreURL from '@ffmpeg/core?url';
 import wasmURL from '@ffmpeg/core/wasm?url';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
-import type { DemoRecording, ZoomKeyframe } from '@demoforge/core';
+import type { CaptionCue, DemoRecording, ZoomKeyframe } from '@demoforge/core';
 import { compose } from '../render/compose.js';
 import { outputAspect, type FrameStyle } from '../render/style.js';
 
@@ -35,6 +35,7 @@ export interface ExportOptions {
   /** The original bundle file, so the audio track can be muxed back in. */
   media: Blob;
   keyframes: readonly ZoomKeyframe[];
+  captions: readonly CaptionCue[];
   style: FrameStyle;
   fps: number;
   onProgress: (stage: string, ratio: number) => void;
@@ -92,7 +93,7 @@ function toJpeg(canvas: HTMLCanvasElement): Promise<Blob> {
 }
 
 export async function exportMp4(o: ExportOptions): Promise<Blob> {
-  const { rec, video, keyframes, style, fps } = o;
+  const { rec, video, keyframes, captions, style, fps } = o;
   const { w, h } = outputSize(video.videoWidth, video.videoHeight, style);
 
   const canvas = document.createElement('canvas');
@@ -115,7 +116,7 @@ export async function exportMp4(o: ExportOptions): Promise<Blob> {
       if (o.signal?.aborted) throw new Error('Export cancelled.');
       const t = (i / fps) * 1000;
       await seek(video, t / 1000);
-      compose(ctx, w, h, { video, rec, keyframes, t, style });
+      compose(ctx, w, h, { video, rec, keyframes, captions, t, style });
       const jpeg = await toJpeg(canvas);
       await ffmpeg.writeFile(`f${String(i).padStart(6, '0')}.jpg`, await fetchFile(jpeg));
       o.onProgress('Rendering frames', (i + 1) / total);

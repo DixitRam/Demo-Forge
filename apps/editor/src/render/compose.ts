@@ -7,8 +7,15 @@
  * All the arithmetic lives in geometry.ts, where it is unit-tested.
  */
 
-import { cursorAt, evaluateZoom, type DemoRecording, type ZoomKeyframe } from '@demoforge/core';
+import {
+  cursorAt,
+  evaluateZoom,
+  type CaptionCue,
+  type DemoRecording,
+  type ZoomKeyframe,
+} from '@demoforge/core';
 import { drawBackground } from './drawBackground.js';
+import { captionAt, drawCaption } from './drawCaptions.js';
 import { drawCursor } from './drawCursor.js';
 import { stageGeometry, type Stage } from './geometry.js';
 import { cursorMoveMs, unit, type FrameStyle } from './style.js';
@@ -18,6 +25,7 @@ export interface ComposeOptions {
   video: HTMLVideoElement;
   rec: DemoRecording;
   keyframes: readonly ZoomKeyframe[];
+  captions?: readonly CaptionCue[];
   /** Playhead in ms, on the same clock as DemoEvent.t. */
   t: number;
   style: FrameStyle;
@@ -79,6 +87,11 @@ export function compose(
     drawCursor(ctx, stage, h, cursorAt(o.rec, o.t, { moveMs: cursorMoveMs(cur.smoothing) }), cur);
   }
   ctx.restore();
+
+  // Outside the clip and outside the zoom: a caption belongs to the viewer,
+  // not to the picture.
+  const cue = o.captions && captionAt(o.captions, o.t);
+  if (cue) drawCaption(ctx, stage, h, cue, o.style.captions);
 
   return stage;
 }

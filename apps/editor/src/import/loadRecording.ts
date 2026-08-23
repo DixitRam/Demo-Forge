@@ -1,4 +1,14 @@
-import { reconcileTimebase, type DemoRecording } from '@demoforge/core';
+import {
+  DEFAULT_STYLE,
+  isProject,
+  parseProject,
+  planZooms,
+  reconcileTimebase,
+  type CaptionCue,
+  type DemoRecording,
+  type ProjectStyle,
+  type ZoomKeyframe,
+} from '@demoforge/core';
 
 export interface LoadedProject {
   rec: DemoRecording;
@@ -7,6 +17,10 @@ export interface LoadedProject {
   /** The original file, kept so the exporter can mux its audio track back in. */
   media: Blob;
   mediaName: string;
+  /** Edits restored from a project file, or planned fresh from the log. */
+  zooms: ZoomKeyframe[];
+  captions: CaptionCue[];
+  style: ProjectStyle;
   warning?: string;
 }
 
@@ -54,19 +68,37 @@ function loadVideo(url: string): Promise<HTMLVideoElement> {
   });
 }
 
+/**
+ * Accepts either a saved project (.dfp.json — recording plus every edit) or a
+ * raw demo.json straight out of the extension, which gets a freshly planned
+ * set of zooms.
+ */
 export async function loadBundle(files: File[]): Promise<LoadedProject> {
   const json = files.find((f) => f.name.endsWith('.json'));
   const media = files.find((f) => /\.(webm|mp4|mkv)$/i.test(f.name));
-  if (!json || !media) throw new Error('Drop both demo.json and recording.webm.');
+  if (!json || !media) {
+    throw new Error('Drop a video plus either demo.json or a .dfp.json project.');
+  }
 
   const parsed: unknown = JSON.parse(await json.text());
-  if (!isRecording(parsed)) throw new Error(`${json.name} is not a DemoRecording.`);
+  const project = isProject(parsed) ? parseProject(parsed) : null;
+  const source = project ? project.recording : parsed;
+  if (!isRecording(source)) throw new Error(`${json.name} is not a DemoRecording.`);
 
   const videoUrl = URL.createObjectURL(media);
   const video = await loadVideo(videoUrl);
 
   // Timing risk #1: trust the decoded video over what the recorder claimed.
-  const { rec, warning } = reconcileTimebase(parsed, await realDurationMs(video));
-  const base = { rec, video, videoUrl, media, mediaName: media.name };
+  const { rec, warning } = reconcileTimebase(source, await realDurationMs(video));
+  const base: LoadedProject = {
+    rec,
+    video,
+    videoUrl,
+    media,
+    mediaName: media.name,
+    zooms: project ? project.zooms : planZooms(rec),
+    captions: project ? project.captions : [],
+    style: project ? project.style : DEFAULT_STYLE,
+  };
   return warning ? { ...base, warning } : base;
 }

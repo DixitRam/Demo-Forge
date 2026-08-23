@@ -1,16 +1,25 @@
-import { planZooms, type ZoomKeyframe } from '@demoforge/core';
+import {
+  createProject,
+  planZooms,
+  type CaptionCue,
+  type ProjectStyle,
+  type ZoomKeyframe,
+} from '@demoforge/core';
 import { useCallback, useState } from 'react';
 import type { LoadedProject } from '../import/loadRecording.js';
-import { DEFAULT_STYLE, type FrameStyle } from '../render/style.js';
+import { DEFAULT_STYLE } from '../render/style.js';
 
 export function useProject() {
   const [project, setProject] = useState<LoadedProject | null>(null);
   const [keyframes, setKeyframes] = useState<ZoomKeyframe[]>([]);
-  const [style, setStyle] = useState<FrameStyle>(DEFAULT_STYLE);
+  const [captions, setCaptions] = useState<CaptionCue[]>([]);
+  const [style, setStyle] = useState<ProjectStyle>(DEFAULT_STYLE);
 
   const load = useCallback((p: LoadedProject) => {
     setProject(p);
-    setKeyframes(planZooms(p.rec));
+    setKeyframes(p.zooms);
+    setCaptions(p.captions);
+    setStyle(p.style);
   }, []);
 
   // The planner output is a starting point; the timeline owns it after that.
@@ -18,5 +27,33 @@ export function useProject() {
     if (project) setKeyframes(planZooms(project.rec));
   }, [project]);
 
-  return { project, keyframes, setKeyframes, style, setStyle, load, replan };
+  /**
+   * Save everything but the video as one readable JSON file. It is the same
+   * schema a script or an agent can edit and hand back.
+   */
+  const save = useCallback(() => {
+    if (!project) return;
+    const doc = createProject(project.rec, project.mediaName, keyframes, captions, style);
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' }),
+    );
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${project.mediaName.replace(/\.[^.]+$/, '') || 'demo'}.dfp.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [project, keyframes, captions, style]);
+
+  return {
+    project,
+    keyframes,
+    setKeyframes,
+    captions,
+    setCaptions,
+    style,
+    setStyle,
+    load,
+    replan,
+    save,
+  };
 }

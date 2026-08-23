@@ -1,25 +1,32 @@
-import type { DemoRecording, ZoomKeyframe } from '@demoforge/core';
+import type { CaptionCue, DemoRecording, ZoomKeyframe } from '@demoforge/core';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { captionSlotAt, insertCaption, moveCaption } from './captionOps.js';
 import { applyDrag, freeSlotAt, insertZoom, snapWithin, type DragMode } from './kfOps.js';
+import Pill from './Pill.js';
 import { fullView, panView, revealTime, zoomView, type View } from './view.js';
-import ZoomPill from './ZoomPill.js';
+
+export type Selection = { kind: 'zoom' | 'caption'; index: number } | null;
 
 const TICK_STEPS_MS = [
   100, 250, 500, 1000, 2000, 5000, 10_000, 15_000, 30_000, 60_000, 120_000, 300_000,
 ];
 const MIN_LABEL_GAP_PX = 68;
-const LANE_LABEL_W = 56;
+const LANE_LABEL_W = 62;
 
 interface Props {
   rec: DemoRecording;
   keyframes: ZoomKeyframe[];
   setKeyframes: (kfs: ZoomKeyframe[]) => void;
+  captions: CaptionCue[];
+  setCaptions: (c: CaptionCue[]) => void;
   timeMs: number;
   onSeek: (ms: number) => void;
-  selected: number | null;
-  onSelect: (i: number | null) => void;
+  selection: Selection;
+  onSelect: (s: Selection) => void;
   mediaName: string;
-  addSignal: number;
+  /** Bumped by the Z / C shortcuts. */
+  addZoomSignal: number;
+  addCaptionSignal: number;
 }
 
 function label(ms: number, sub: boolean): string {
@@ -33,13 +40,18 @@ export default function Timeline({
   rec,
   keyframes,
   setKeyframes,
+  captions,
+  setCaptions,
   timeMs,
   onSeek,
-  selected,
+  selection,
   onSelect,
   mediaName,
-  addSignal,
+  addZoomSignal,
+  addCaptionSignal,
 }: Props) {
+  const selZoom = selection?.kind === 'zoom' ? selection.index : null;
+  const selCaption = selection?.kind === 'caption' ? selection.index : null;
   const duration = Math.max(1, rec.video.durationMs);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -99,6 +111,7 @@ export default function Timeline({
   }
 
   const dragBase = useRef<ZoomKeyframe[] | null>(null);
+  const capBase = useRef<CaptionCue[] | null>(null);
 
   const onDrag = (index: number, mode: DragMode, deltaMs: number): void => {
     dragBase.current ??= keyframes;
@@ -118,44 +131,78 @@ export default function Timeline({
     );
   };
 
-  const addAt = useCallback(
+  const onCaptionDrag = (index: number, mode: DragMode, deltaMs: number): void => {
+    capBase.current ??= captions;
+    setCaptions(moveCaption(capBase.current, index, mode, deltaMs, duration));
+  };
+
+  const addZoomAt = useCallback(
     (t: number): void => {
       const next = insertZoom(keyframes, rec, t);
       if (next.length === keyframes.length) return;
       setKeyframes(next);
-      onSelect(next.findIndex((k) => t >= k.tStart && t < k.tEnd));
+      onSelect({ kind: 'zoom', index: next.findIndex((k) => t >= k.tStart && t < k.tEnd) });
     },
     [keyframes, rec, setKeyframes, onSelect],
   );
 
-  // App raises addSignal when the Z shortcut fires.
-  const lastSignal = useRef(addSignal);
-  useEffect(() => {
-    if (addSignal === lastSignal.current) return;
-    lastSignal.current = addSignal;
-    addAt(timeMs);
-  }, [addSignal, addAt, timeMs]);
+  const addCaptionAt = useCallback(
+    (t: number): void => {
+      const next = insertCaption(captions, t, duration);
+      if (next.length === captions.length) return;
+      setCaptions(next);
+      onSelect({ kind: 'caption', index: next.findIndex((c) => t >= c.tStart && t < c.tEnd) });
+    },
+    [captions, duration, setCaptions, onSelect],
+  );
 
-  const canAdd = freeSlotAt(keyframes, timeMs, duration) !== null;
+  // App raises these counters when the Z / C shortcuts fire.
+  const lastZoom = useRef(addZoomSignal);
+  useEffect(() => {
+    if (addZoomSignal === lastZoom.current) return;
+    lastZoom.current = addZoomSignal;
+    addZoomAt(timeMs);
+  }, [addZoomSignal, addZoomAt, timeMs]);
+
+  const lastCaption = useRef(addCaptionSignal);
+  useEffect(() => {
+    if (addCaptionSignal === lastCaption.current) return;
+    lastCaption.current = addCaptionSignal;
+    addCaptionAt(timeMs);
+  }, [addCaptionSignal, addCaptionAt, timeMs]);
+
+  const canAddZoom = freeSlotAt(keyframes, timeMs, duration) !== null;
+  const canAddCaption = captionSlotAt(captions, timeMs, duration) !== null;
   const playheadX = toPx(Math.min(timeMs, duration));
 
   return (
     <div className="select-none">
       <div className="flex items-center gap-2 px-4 py-1.5 text-[11px] text-slate-500">
         <button
-          onClick={() => addAt(timeMs)}
-          disabled={!canAdd}
+          onClick={() => addZoomAt(timeMs)}
+          disabled={!canAddZoom}
           className="rounded bg-slate-800 px-2 py-0.5 text-slate-200 hover:bg-slate-700 disabled:opacity-40"
         >
           + Zoom <kbd className="text-slate-500">Z</kbd>
         </button>
         <button
+          onClick={() => addCaptionAt(timeMs)}
+          disabled={!canAddCaption}
+          className="rounded bg-slate-800 px-2 py-0.5 text-slate-200 hover:bg-slate-700 disabled:opacity-40"
+        >
+          + Caption <kbd className="text-slate-500">C</kbd>
+        </button>
+        <button
           onClick={() => {
-            if (selected === null) return;
-            setKeyframes(keyframes.filter((_, i) => i !== selected));
+            if (!selection) return;
+            if (selection.kind === 'zoom') {
+              setKeyframes(keyframes.filter((_, i) => i !== selection.index));
+            } else {
+              setCaptions(captions.filter((_, i) => i !== selection.index));
+            }
             onSelect(null);
           }}
-          disabled={selected === null}
+          disabled={!selection}
           className="rounded bg-slate-800 px-2 py-0.5 text-slate-200 hover:bg-slate-700 disabled:opacity-40"
         >
           Delete
@@ -175,6 +222,7 @@ export default function Timeline({
       <div className="flex">
         <div className="shrink-0 pt-6 pl-4 text-[10px] text-slate-600" style={{ width: LANE_LABEL_W }}>
           <div className="flex h-9 items-center">zoom</div>
+          <div className="flex h-8 items-center">caption</div>
           <div className="flex h-7 items-center">clip</div>
         </div>
 
@@ -211,7 +259,7 @@ export default function Timeline({
 
           <div
             onPointerDown={() => onSelect(null)}
-            onDoubleClick={(e) => addAt(toMs(e.clientX))}
+            onDoubleClick={(e) => addZoomAt(toMs(e.clientX))}
             className="relative h-9 border-b border-slate-800/60 bg-slate-900/60"
           >
             {keyframes.map((kf, i) => {
@@ -219,14 +267,16 @@ export default function Timeline({
               const w = (kf.tEnd - kf.tStart) * pxPerMs;
               if (l + w < -20 || l > width + 20) return null;
               return (
-                <ZoomPill
+                <Pill
                   key={i}
-                  kf={kf}
+                  tone="zoom"
                   leftPx={l}
                   widthPx={w}
                   pxPerMs={pxPerMs}
-                  selected={selected === i}
-                  onSelect={() => onSelect(i)}
+                  selected={selZoom === i}
+                  title={`${(kf.tStart / 1000).toFixed(2)}s – ${(kf.tEnd / 1000).toFixed(2)}s · ${kf.scale.toFixed(2)}×`}
+                  label={`${kf.scale.toFixed(2)}×`}
+                  onSelect={() => onSelect({ kind: 'zoom', index: i })}
                   onDrag={(mode, delta) => onDrag(i, mode, delta)}
                   onDragEnd={() => {
                     dragBase.current = null;
@@ -237,6 +287,40 @@ export default function Timeline({
             {keyframes.length === 0 && (
               <span className="pointer-events-none absolute inset-0 grid place-items-center text-[11px] text-slate-600">
                 Press Z to add a zoom
+              </span>
+            )}
+          </div>
+
+          <div
+            onPointerDown={() => onSelect(null)}
+            onDoubleClick={(e) => addCaptionAt(toMs(e.clientX))}
+            className="relative h-8 border-b border-slate-800/60 bg-slate-900/40"
+          >
+            {captions.map((cue, i) => {
+              const l = toPx(cue.tStart);
+              const w = (cue.tEnd - cue.tStart) * pxPerMs;
+              if (l + w < -20 || l > width + 20) return null;
+              return (
+                <Pill
+                  key={i}
+                  tone="caption"
+                  leftPx={l}
+                  widthPx={w}
+                  pxPerMs={pxPerMs}
+                  selected={selCaption === i}
+                  title={cue.text}
+                  label={cue.text}
+                  onSelect={() => onSelect({ kind: 'caption', index: i })}
+                  onDrag={(mode, delta) => onCaptionDrag(i, mode, delta)}
+                  onDragEnd={() => {
+                    capBase.current = null;
+                  }}
+                />
+              );
+            })}
+            {captions.length === 0 && (
+              <span className="pointer-events-none absolute inset-0 grid place-items-center text-[11px] text-slate-600">
+                Press C to add a caption
               </span>
             )}
           </div>

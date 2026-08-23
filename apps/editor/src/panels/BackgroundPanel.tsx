@@ -19,11 +19,15 @@ export default function BackgroundPanel({
   );
   const setBg = (background: Background): void => setStyle({ ...style, background });
 
+  // Read to a data: URL rather than an object URL, so a saved project keeps
+  // its wallpaper without the original file sitting next to it.
   const upload = (file: File | undefined): void => {
     if (!file) return;
-    const image = new Image();
-    image.onload = () => setBg({ kind: 'image', image });
-    image.src = URL.createObjectURL(file);
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') setBg({ kind: 'image', src: reader.result });
+    };
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -43,7 +47,7 @@ export default function BackgroundPanel({
           </label>
           {bg.kind === 'image' && (
             <div className="overflow-hidden rounded-md border-2 border-sky-400">
-              <img src={bg.image.src} alt="" className="h-16 w-full object-cover" />
+              <img src={bg.src} alt="" className="h-16 w-full object-cover" />
             </div>
           )}
           <div className="grid grid-cols-4 gap-2">

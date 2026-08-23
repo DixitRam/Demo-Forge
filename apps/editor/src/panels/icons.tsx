@@ -47,6 +47,13 @@ export const IconZoom = () => (
   </svg>
 );
 
+export const IconCaption = () => (
+  <svg {...base}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="M7 14h4M13 14h4" />
+  </svg>
+);
+
 export const IconPlay = () => (
   <svg {...base} fill="currentColor" stroke="none">
     <path d="M8 5.5v13l11-6.5-11-6.5Z" />

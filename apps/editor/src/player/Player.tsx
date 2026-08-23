@@ -1,4 +1,4 @@
-import type { ZoomKeyframe } from '@demoforge/core';
+import type { CaptionCue, ZoomKeyframe } from '@demoforge/core';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { LoadedProject } from '../import/loadRecording.js';
 import { compose } from '../render/compose.js';
@@ -10,19 +10,20 @@ const PREVIEW_WIDTH = 1280;
 interface Props {
   project: LoadedProject;
   keyframes: readonly ZoomKeyframe[];
+  captions: readonly CaptionCue[];
   style: FrameStyle;
   onTime: (ms: number) => void;
   /** Rendered over the canvas, stretched to the same box. */
   overlay?: (canvas: { w: number; h: number }) => ReactNode;
 }
 
-export default function Player({ project, keyframes, style, onTime, overlay }: Props) {
+export default function Player({ project, keyframes, captions, style, onTime, overlay }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: PREVIEW_WIDTH, h: 720 });
 
   // The draw loop reads the latest props through a ref so it never restarts.
-  const latest = useRef({ keyframes, style, onTime });
-  latest.current = { keyframes, style, onTime };
+  const latest = useRef({ keyframes, captions, style, onTime });
+  latest.current = { keyframes, captions, style, onTime };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -47,6 +48,7 @@ export default function Player({ project, keyframes, style, onTime, overlay }: P
         video,
         rec,
         keyframes: cur.keyframes,
+        captions: cur.captions,
         t,
         style: cur.style,
       });

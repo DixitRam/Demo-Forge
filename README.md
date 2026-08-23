@@ -44,6 +44,7 @@ An icon rail on the right opens five panels:
 | --- | --- |
 | Background | Image / Colour / Gradient tabs — 18 generated wallpapers, custom upload, gradient presets with editable stops and angle |
 | Zoom | Auto-zoom toggle, per-zoom or global scale, re-plan from the click log |
+| Captions | Add at the playhead, draft a set from the click log, edit text, position / size / colour |
 | Effects | Padding, corner radius, shadow blur / offset / strength |
 | Layout | Output aspect — Original, 16:9, 9:16, 1:1, 4:3, 4:5 |
 | Cursor | Show, click pulse, size, smoothing |
@@ -58,21 +59,76 @@ re-aims itself if you drag the pill somewhere else on the timeline. Placing a
 point by hand switches it to **manual**, and nothing moves it again until you
 reset it.
 
+Captions are drawn over the frame but outside the zoom transform — a caption
+belongs to the viewer, not to the picture, so it does not slide or grow when
+the camera moves. **From clicks** drafts one cue per click out of the element
+text the extension already recorded; that is string formatting, not AI.
+
 The timeline has a scrubbable ruler with amber marks at every logged click, a
-zoom lane of draggable pills, and a clip lane. **Ctrl+Scroll** zooms the view
+zoom lane, a caption lane, and a clip lane. **Ctrl+Scroll** zooms the view
 about the pointer, **Shift+Scroll** pans, and the window follows the playhead.
 
 | Key | |
 | --- | --- |
 | `Space` | play / pause |
 | `Z` | add a zoom at the playhead |
-| `Delete` | remove the selected zoom |
+| `C` | add a caption at the playhead |
+| `S` | save the project |
+| `Delete` | remove the selection |
+| `Esc` | deselect |
 | `←` `→` | step one frame (hold `Shift` for a second) |
 | `Home` `End` | jump to start / end |
 
 Wallpapers are generated, not shipped — a base colour plus soft radial blobs,
 painted by one function used for both the picker swatch and the full frame, so
 the swatch cannot lie and there are no binary assets in the repo.
+
+## Saving: the project file
+
+**Save project** (or `S`) writes `<name>.dfp.json` — the recording plus every
+edit, as plain readable JSON. Drop it back in with the video to carry on. A raw
+`demo.json` still opens too; it just gets freshly planned zooms.
+
+The schema lives in `packages/core/src/project.ts`, not in the editor, because
+the point is that the editor is not the only thing that can write one. A
+script, a CI job, or Claude Code can open a project, change the zooms or
+captions, write it back, and the editor will render exactly that.
+
+```jsonc
+{
+  "format": "demoforge-project",
+  "version": 1,
+  "mediaName": "recording.webm",       // referenced, not embedded
+  "recording": { /* the DemoRecording from capture */ },
+  "zooms": [
+    { "tStart": 1500, "tEnd": 3700, "targetXNorm": 0.42, "targetYNorm": 0.31,
+      "scale": 1.8, "easing": "easeInOutCubic", "focus": "auto" }
+  ],
+  "captions": [
+    { "tStart": 2000, "tEnd": 4200, "text": "Click \"Add Widget\"" }
+  ],
+  "style": { "background": { "kind": "wallpaper", "id": "cobalt" }, "aspect": null,
+             "padding": 0.05, "radius": 0.02, "shadow": { "blur": 0.05, "y": 0.018, "alpha": 0.5 },
+             "cursor": { "show": true, "size": 0.045, "smoothing": 0.4, "clicks": true },
+             "captions": { "size": 0.045, "position": "bottom", "color": "#ffffff",
+                           "background": "rgba(2,6,23,0.72)" } }
+}
+```
+
+Notes for anything editing one by hand:
+
+- `zooms` and `captions` are **time-ordered**, so "the third zoom" is stable.
+  Neither list may overlap itself.
+- All coordinates are **0..1**, all style lengths are **fractions of the
+  output's shorter side**. No pixels anywhere.
+- `focus: "auto"` means the zoom is aimed at the nearest click and will re-aim
+  if moved; `"manual"` pins it.
+- `parseProject()` is a trust boundary: it sorts and de-overlaps the lists,
+  clamps every number into range, drops zero-length spans, and falls back to
+  defaults rather than letting `NaN` reach the renderer. It throws only on a
+  missing recording or a format version it does not understand — so a
+  roughly-right file loads rather than failing.
+- Omitting `zooms`, `captions` or `style` entirely is fine; they default.
 
 ## The architecture contract
 

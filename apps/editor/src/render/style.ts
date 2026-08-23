@@ -1,46 +1,17 @@
 /**
- * Frame styling and render settings.
- *
- * Every length here is a FRACTION of the output's shorter side, never pixels.
- * The preview renders at ~1280px and the exporter at native size, so a pixel
- * radius or shadow would quietly look different in the file you ship than in
- * the editor you tuned it in.
+ * Render settings live in `@demoforge/core` (see project.ts) so a saved
+ * project is plain data an agent can edit. This module holds only the
+ * editor-side presets and helpers built on top of them.
  */
 
-export type Background =
-  | { kind: 'solid'; color: string }
-  | { kind: 'gradient'; from: string; to: string; angle: number }
-  | { kind: 'wallpaper'; id: string }
-  | { kind: 'image'; image: HTMLImageElement };
-
-export interface CursorStyle {
-  show: boolean;
-  /** Height as a fraction of the output height. */
-  size: number;
-  /** 0 = snap between clicks, 1 = long lazy glides. */
-  smoothing: number;
-  /** Draw the ring pulse on click. */
-  clicks: boolean;
-}
-
-export interface FrameStyle {
-  background: Background;
-  /** Output aspect ratio (w/h). null keeps the recording's own. */
-  aspect: number | null;
-  padding: number;
-  radius: number;
-  shadow: { blur: number; y: number; alpha: number };
-  cursor: CursorStyle;
-}
-
-export const DEFAULT_STYLE: FrameStyle = {
-  background: { kind: 'wallpaper', id: 'cobalt' },
-  aspect: null,
-  padding: 0.05,
-  radius: 0.02,
-  shadow: { blur: 0.05, y: 0.018, alpha: 0.5 },
-  cursor: { show: true, size: 0.045, smoothing: 0.4, clicks: true },
-};
+export type {
+  CaptionCue,
+  CaptionStyle,
+  CursorStyle,
+  ProjectBackground as Background,
+  ProjectStyle as FrameStyle,
+} from '@demoforge/core';
+export { DEFAULT_STYLE } from '@demoforge/core';
 
 export const ASPECT_PRESETS: Array<{ label: string; value: number | null }> = [
   { label: 'Original', value: null },
@@ -65,7 +36,11 @@ export function unit(w: number, h: number): number {
 }
 
 /** Output aspect for a recording under the current style. */
-export function outputAspect(style: FrameStyle, videoW: number, videoH: number): number {
+export function outputAspect(
+  style: { aspect: number | null },
+  videoW: number,
+  videoH: number,
+): number {
   return style.aspect ?? (videoH > 0 ? videoW / videoH : 16 / 9);
 }
 

@@ -1,4 +1,4 @@
-import type { ZoomKeyframe } from '@demoforge/core';
+import type { CaptionCue, ZoomKeyframe } from '@demoforge/core';
 import { useRef, useState } from 'react';
 import type { LoadedProject } from '../import/loadRecording.js';
 import type { FrameStyle } from '../render/style.js';
@@ -9,10 +9,11 @@ const FPS_CHOICES = [24, 30, 60];
 interface Props {
   project: LoadedProject;
   keyframes: readonly ZoomKeyframe[];
+  captions: readonly CaptionCue[];
   style: FrameStyle;
 }
 
-export default function ExportDialog({ project, keyframes, style }: Props) {
+export default function ExportDialog({ project, keyframes, captions, style }: Props) {
   const [open, setOpen] = useState(false);
   const [fps, setFps] = useState(30);
   const [stage, setStage] = useState<string | null>(null);
@@ -31,6 +32,7 @@ export default function ExportDialog({ project, keyframes, style }: Props) {
         video: project.video,
         media: project.media,
         keyframes,
+        captions,
         style,
         fps,
         signal: abort.current.signal,

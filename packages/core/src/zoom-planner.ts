@@ -96,6 +96,7 @@ export function planZooms(rec: DemoRecording, cfg?: Partial<ZoomConfig>): ZoomKe
       targetYNorm: clampTarget(ev.yNorm, c.zoomScale),
       scale: c.zoomScale,
       easing: 'easeInOutCubic',
+      focus: 'auto',
     });
   }
 

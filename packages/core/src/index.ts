@@ -20,3 +20,20 @@ export type { ReconcileResult } from './timebase.js';
 
 export { clamp01, ease, lerp } from './easing.js';
 export type { Easing } from './easing.js';
+
+export {
+  DEFAULT_STYLE,
+  PROJECT_FORMAT,
+  PROJECT_VERSION,
+  createProject,
+  isProject,
+  parseProject,
+} from './project.js';
+export type {
+  CaptionCue,
+  CaptionStyle,
+  CursorStyle,
+  DemoProject,
+  ProjectBackground,
+  ProjectStyle,
+} from './project.js';

@@ -1,6 +1,18 @@
 import type { FrameStyle } from './style.js';
 import { getWallpaper, paintWallpaper } from './wallpapers.js';
 
+const images = new Map<string, HTMLImageElement>();
+
+/** Decode a background image once per src; redraws hit the cache. */
+export function imageFor(src: string): HTMLImageElement {
+  const hit = images.get(src);
+  if (hit) return hit;
+  const img = new Image();
+  img.src = src;
+  images.set(src, img);
+  return img;
+}
+
 export function drawBackground(
   ctx: CanvasRenderingContext2D,
   w: number,
@@ -34,8 +46,9 @@ export function drawBackground(
     return;
   }
 
-  // Uploaded image: cover the canvas, cropping the overflow.
-  const img = bg.image;
+  // Uploaded image: cover the canvas, cropping the overflow. The project
+  // stores a data: URL, so decode once and keep it.
+  const img = imageFor(bg.src);
   const iw = img.naturalWidth || 1;
   const ih = img.naturalHeight || 1;
   const cover = Math.max(w / iw, h / ih);
