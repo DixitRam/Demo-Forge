@@ -11,6 +11,8 @@
  * `local` is espeak-ng on this machine: free, offline, instant, robotic.
  * `gemini` is Google's hosted TTS: needs GEMINI_API_KEY, sounds like a person,
  * and takes a director's note instead of a words-per-minute dial.
+ * `elevenlabs` needs ELEVENLABS_API_KEY, has the best voices, and is metered
+ * per character — so it reports what is left of the allowance.
  *
  * ponytail: dev-server only, so a built editor has no voice provider. Fine
  * while this is a self-hosted tool you run with `pnpm dev`; the fix is the
@@ -24,11 +26,27 @@ import { loadEnv, type Plugin } from 'vite';
 
 const BIN = 'espeak-ng';
 const DEFAULT_GEMINI_MODEL = 'gemini-3.1-flash-tts-preview';
+const ELEVEN_API = 'https://api.elevenlabs.io/v1';
+/**
+ * Multilingual v2 is 1 credit per character. `eleven_flash_v2_5` is half that
+ * and noticeably less good — set ELEVENLABS_MODEL if the allowance matters
+ * more than the voice.
+ */
+const DEFAULT_ELEVEN_MODEL = 'eleven_multilingual_v2';
+/**
+ * 44.1 kHz PCM needs a Pro subscription; 24 kHz is what every tier can ask
+ * for, and it is the rate Gemini returns anyway.
+ */
+const ELEVEN_FORMAT = 'pcm_24000';
+/** The free tier refuses anything longer in a single request. */
+const ELEVEN_MAX_TEXT = 2500;
 
 /** espeak voice ids and variants: `en-us`, `en-gb+f3`. Nothing else runs. */
 const ESPEAK_VOICE_RE = /^[a-z0-9]([a-z0-9_-]*)(\+[a-z0-9_]+)?$/i;
 /** Gemini's prebuilt voices are bare names. */
 const GEMINI_VOICE_RE = /^[A-Za-z][A-Za-z0-9]{1,31}$/;
+/** ElevenLabs voice ids are opaque alphanumerics. */
+const ELEVEN_VOICE_RE = /^[A-Za-z0-9]{8,40}$/;
 const MAX_TEXT = 2000;
 const MAX_BODY = 64 * 1024;
 
@@ -63,8 +81,13 @@ const GEMINI_VOICES: VoiceOption[] = [
   { id: 'Schedar', label: 'Schedar · even' },
 ];
 
+export interface Quota {
+  used: number;
+  limit: number;
+}
+
 export interface ProviderInfo {
-  id: 'local' | 'gemini';
+  id: 'local' | 'gemini' | 'elevenlabs';
   label: string;
   ok: boolean;
   error?: string;
@@ -73,6 +96,10 @@ export interface ProviderInfo {
   rate: boolean;
   /** Whether it takes a free-text director's note. */
   direction: boolean;
+  /** Characters spent against a metered allowance, when the provider says. */
+  quota?: Quota;
+  /** Conditions attached to using it, shown in the panel. */
+  note?: string;
 }
 
 // --- shared ----------------------------------------------------------------
@@ -240,6 +267,74 @@ export function readableError(e: unknown): string {
   return msg.trim() || 'Speech failed.';
 }
 
+// --- elevenlabs -------------------------------------------------------------
+
+/** ElevenLabs puts its message under `detail`, sometimes as a bare string. */
+export async function elevenError(res: Response): Promise<string> {
+  const body: unknown = await res.json().catch(() => null);
+  const detail = (body as { detail?: unknown } | null)?.detail;
+  if (typeof detail === 'string') return detail;
+  const message = (detail as { message?: unknown } | undefined)?.message;
+  if (typeof message === 'string') return message;
+  return `ElevenLabs returned ${res.status}.`;
+}
+
+/**
+ * The account's own voices, live. No hardcoded ids: a voice list that has
+ * drifted is worse than no list, and without a key you cannot call anyway.
+ */
+async function elevenVoices(apiKey: string): Promise<VoiceOption[]> {
+  const res = await fetch(`${ELEVEN_API}/voices`, { headers: { 'xi-api-key': apiKey } });
+  if (!res.ok) throw new Error(await elevenError(res));
+  const body = (await res.json()) as {
+    voices?: Array<{ voice_id?: string; name?: string; labels?: Record<string, string> }>;
+  };
+  return (body.voices ?? [])
+    .filter((v): v is { voice_id: string; name?: string; labels?: Record<string, string> } =>
+      typeof v.voice_id === 'string',
+    )
+    .map((v) => {
+      const traits = Object.values(v.labels ?? {})
+        .filter(Boolean)
+        .slice(0, 2)
+        .join(', ');
+      return { id: v.voice_id, label: traits ? `${v.name ?? v.voice_id} · ${traits}` : (v.name ?? v.voice_id) };
+    });
+}
+
+/** Characters spent this period. Free tier is 10k, and it goes fast. */
+async function elevenQuota(apiKey: string): Promise<Quota | null> {
+  const res = await fetch(`${ELEVEN_API}/user/subscription`, {
+    headers: { 'xi-api-key': apiKey },
+  });
+  if (!res.ok) return null;
+  const b = (await res.json()) as { character_count?: number; character_limit?: number };
+  if (typeof b.character_count !== 'number' || typeof b.character_limit !== 'number') return null;
+  return { used: b.character_count, limit: b.character_limit };
+}
+
+async function speakEleven(
+  text: string,
+  voice: string,
+  apiKey: string,
+  model: string,
+): Promise<Buffer> {
+  const res = await fetch(
+    `${ELEVEN_API}/text-to-speech/${voice}?output_format=${ELEVEN_FORMAT}`,
+    {
+      method: 'POST',
+      headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, model_id: model }),
+    },
+  );
+  if (!res.ok) throw new Error(await elevenError(res));
+
+  const pcm = Buffer.from(await res.arrayBuffer());
+  if (pcm.length === 0) throw new Error('ElevenLabs returned no audio for that line.');
+  // We asked for headerless PCM at a known rate, so the header is ours.
+  return Buffer.concat([wavHeader(pcm.length, 1, 24_000, 16), pcm]);
+}
+
 /**
  * A quota error carries the wait in its own text ("Please retry in 32.6s").
  * Handing that number back turns a dead end into a pause — a free-tier key is
@@ -254,7 +349,33 @@ export function retryAfterMs(message: string): number | null {
 
 // --- endpoint --------------------------------------------------------------
 
-function providers(apiKey: string, espeak: boolean): ProviderInfo[] {
+/**
+ * A hosted provider is "available" when its key is set AND the key works —
+ * for ElevenLabs we find that out by listing voices, which we need anyway.
+ */
+async function elevenProvider(apiKey: string): Promise<ProviderInfo> {
+  const base: ProviderInfo = {
+    id: 'elevenlabs',
+    label: 'ElevenLabs',
+    ok: false,
+    voices: [],
+    rate: false,
+    direction: false,
+    note: 'Free tier: 10,000 characters a month, personal use, credit ElevenLabs.',
+  };
+  if (!apiKey) return { ...base, error: 'ELEVENLABS_API_KEY is not set for the dev server.' };
+
+  try {
+    const [voices, quota] = await Promise.all([elevenVoices(apiKey), elevenQuota(apiKey)]);
+    return { ...base, ok: true, voices, ...(quota ? { quota } : {}) };
+  } catch (e) {
+    return { ...base, error: e instanceof Error ? e.message : 'ElevenLabs is unreachable.' };
+  }
+}
+
+async function providers(env: Record<string, string>): Promise<ProviderInfo[]> {
+  const espeak = await haveEspeak();
+  const geminiKey = env.GEMINI_API_KEY ?? '';
   return [
     {
       id: 'local',
@@ -268,12 +389,13 @@ function providers(apiKey: string, espeak: boolean): ProviderInfo[] {
     {
       id: 'gemini',
       label: 'Gemini AI',
-      ok: apiKey !== '',
-      ...(apiKey ? {} : { error: 'GEMINI_API_KEY is not set for the dev server.' }),
+      ok: geminiKey !== '',
+      ...(geminiKey ? {} : { error: 'GEMINI_API_KEY is not set for the dev server.' }),
       voices: GEMINI_VOICES,
       rate: false,
       direction: true,
     },
+    await elevenProvider(env.ELEVENLABS_API_KEY ?? ''),
   ];
 }
 
@@ -282,13 +404,10 @@ async function handle(
   res: ServerResponse,
   env: Record<string, string>,
 ): Promise<void> {
-  const apiKey = env.GEMINI_API_KEY ?? '';
-  const model = env.GEMINI_TTS_MODEL || DEFAULT_GEMINI_MODEL;
-
   if (req.method === 'GET') {
     res.setHeader('Content-Type', 'application/json');
-    // The key itself never leaves the server — only whether there is one.
-    res.end(JSON.stringify({ providers: providers(apiKey, await haveEspeak()) }));
+    // No key ever leaves the server — only whether there is one that works.
+    res.end(JSON.stringify({ providers: await providers(env) }));
     return;
   }
   if (req.method !== 'POST') {
@@ -308,16 +427,26 @@ async function handle(
     const text = typeof body.text === 'string' ? body.text.trim() : '';
     const voice = typeof body.voice === 'string' ? body.voice : '';
     const direction = typeof body.direction === 'string' ? body.direction.slice(0, 600) : '';
-    const provider = body.provider === 'gemini' ? 'gemini' : 'local';
+    const provider =
+      body.provider === 'gemini' || body.provider === 'elevenlabs' ? body.provider : 'local';
 
     if (!text) return fail(400, 'Nothing to say.');
     if (text.length > MAX_TEXT) return fail(400, `Line is longer than ${MAX_TEXT} characters.`);
 
     let wav: Buffer;
-    if (provider === 'gemini') {
-      if (!apiKey) return fail(503, 'GEMINI_API_KEY is not set for the dev server.');
+    if (provider === 'elevenlabs') {
+      const key = env.ELEVENLABS_API_KEY ?? '';
+      if (!key) return fail(503, 'ELEVENLABS_API_KEY is not set for the dev server.');
+      if (!ELEVEN_VOICE_RE.test(voice)) return fail(400, `Not an ElevenLabs voice id: ${voice}`);
+      if (text.length > ELEVEN_MAX_TEXT) {
+        return fail(400, `ElevenLabs takes at most ${ELEVEN_MAX_TEXT} characters per line.`);
+      }
+      wav = await speakEleven(text, voice, key, env.ELEVENLABS_MODEL || DEFAULT_ELEVEN_MODEL);
+    } else if (provider === 'gemini') {
+      const key = env.GEMINI_API_KEY ?? '';
+      if (!key) return fail(503, 'GEMINI_API_KEY is not set for the dev server.');
       if (!GEMINI_VOICE_RE.test(voice)) return fail(400, `Not a Gemini voice: ${voice}`);
-      wav = await speakGemini(text, voice, direction, apiKey, model);
+      wav = await speakGemini(text, voice, direction, key, env.GEMINI_TTS_MODEL || DEFAULT_GEMINI_MODEL);
     } else {
       const rate = Math.round(Number(body.rate));
       if (!ESPEAK_VOICE_RE.test(voice)) return fail(400, `Not a voice id: ${voice}`);

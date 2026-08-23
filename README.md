@@ -20,7 +20,7 @@ scripts/            make-fixture.sh — synthetic bundle with known coordinates
 
 ```sh
 pnpm install
-pnpm -r test                  # 190 tests
+pnpm -r test                  # 193 tests
 pnpm -C apps/extension build  # then load apps/extension/dist unpacked in Chrome
 pnpm -C apps/editor dev
 ```
@@ -37,6 +37,11 @@ which ones are available.
   A free-tier key allows only a few requests a minute, so generating a long
   script pauses when the quota says to and picks up again — the button tells
   you how long it is waiting.
+- **ElevenLabs** — `ELEVENLABS_API_KEY`, same two locations. The best voices.
+  Metered per character: the free tier is 10,000 characters a month, personal
+  use only, and asks you to credit ElevenLabs. The panel shows what is left
+  and what the next generate will cost, and warns before a run that would run
+  out partway.
 
 ## The workflow
 
@@ -140,11 +145,17 @@ A few things follow from how it is wired:
   the exporter never learn who spoke.
 - **Different providers take different dials.** espeak-ng takes words per
   minute; Gemini takes a **director's note** — free text describing tone, pace
-  and accent, handed to the model alongside the line. The panel shows only the
-  dials the chosen provider actually uses, and switching provider or note
-  re-speaks the affected lines.
-- **Gemini returns raw PCM** (`audio/L16;rate=24000`), so the WAV header is
-  written server-side before the audio ever reaches the browser.
+  and accent, handed to the model alongside the line; ElevenLabs takes neither
+  and puts everything in the choice of voice. The panel shows only the dials
+  the chosen provider actually uses, and switching provider or note re-speaks
+  the affected lines.
+- **Voice lists come from the provider.** ElevenLabs' are fetched live against
+  your key, so your own cloned voices appear and no hardcoded id can go stale.
+  Its availability means the key *works*, not just that one is set.
+- **Both hosted providers return raw PCM** at 24 kHz — Gemini describes it in
+  a mime type, ElevenLabs is asked for `pcm_24000` — so the WAV header is
+  written server-side before the audio ever reaches the browser. (44.1 kHz
+  from ElevenLabs needs a Pro subscription; 24 kHz does not.)
 - **"Available" means a key is configured**, not that it works — a bad key
   surfaces as the provider's own error the first time you generate.
 

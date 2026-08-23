@@ -24,10 +24,10 @@ export interface ScriptLine {
 
 /**
  * Who speaks. `local` is espeak-ng on the machine running the dev server —
- * free, offline, robotic. `gemini` is Google's hosted TTS, which needs a key
- * and sounds like a person.
+ * free, offline, robotic. `gemini` and `elevenlabs` are hosted, need a key,
+ * and sound like people.
  */
-export type VoiceProvider = 'local' | 'gemini';
+export type VoiceProvider = 'local' | 'gemini' | 'elevenlabs';
 
 export interface VoiceStyle {
   provider: VoiceProvider;

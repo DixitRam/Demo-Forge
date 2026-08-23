@@ -1,6 +1,12 @@
 import { DEFAULT_VOICE } from '@demoforge/core';
 import { describe, expect, it } from 'vitest';
-import { geminiPrompt, pcmFormat, readableError, retryAfterMs } from '../vite-tts.js';
+import {
+  elevenError,
+  geminiPrompt,
+  pcmFormat,
+  readableError,
+  retryAfterMs,
+} from '../vite-tts.js';
 import { lineKey } from '../src/voice/tts.js';
 
 describe('pcmFormat', () => {
@@ -84,5 +90,23 @@ describe('retryAfterMs', () => {
   it('is null for an error that is not worth retrying', () => {
     expect(retryAfterMs('API key not valid.')).toBeNull();
     expect(retryAfterMs('Please retry in a moment')).toBeNull();
+  });
+});
+
+describe('elevenError', () => {
+  const res = (body: unknown, status = 400): Response =>
+    new Response(typeof body === 'string' ? body : JSON.stringify(body), { status });
+
+  it('reads a bare string detail', async () => {
+    expect(await elevenError(res({ detail: 'Invalid API key' }, 401))).toBe('Invalid API key');
+  });
+
+  it('reads the message out of a structured detail', async () => {
+    const body = { detail: { status: 'quota_exceeded', message: 'You have 0 credits left.' } };
+    expect(await elevenError(res(body, 401))).toBe('You have 0 credits left.');
+  });
+
+  it('says something useful when the body is not JSON at all', async () => {
+    expect(await elevenError(res('<html>502</html>', 502))).toBe('ElevenLabs returned 502.');
   });
 });

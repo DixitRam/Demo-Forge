@@ -46,6 +46,44 @@ const stamp = (ms: number): string => {
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 };
 
+/**
+ * A metered provider charges per character, so the panel says what a generate
+ * will cost before you press it rather than after.
+ */
+function ProviderQuota({
+  quota,
+  pending,
+}: {
+  quota: { used: number; limit: number };
+  pending: number;
+}) {
+  const left = Math.max(0, quota.limit - quota.used);
+  const short = pending > left;
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="flex justify-between text-[10px]">
+        <span className="text-slate-400">{left.toLocaleString()} characters left</span>
+        {pending > 0 && (
+          <span className={short ? 'text-red-400' : 'text-slate-500'}>
+            this run: {pending.toLocaleString()}
+          </span>
+        )}
+      </span>
+      <span className="h-1 overflow-hidden rounded bg-slate-800">
+        <span
+          style={{ width: `${Math.min(100, (quota.used / Math.max(1, quota.limit)) * 100)}%` }}
+          className="block h-full bg-sky-400"
+        />
+      </span>
+      {short && (
+        <span className="text-[10px] text-red-400">
+          Not enough left for the whole script — it will stop partway.
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default function ScriptPanel(p: Props) {
   const duration = p.rec.video.durationMs;
   const v = p.style.voice;
@@ -63,7 +101,7 @@ export default function ScriptPanel(p: Props) {
     <div className="flex flex-col gap-5">
       <Section label="Voice">
         {p.providers && (
-          <div className="flex gap-1 rounded-lg bg-slate-900 p-1">
+          <div className="flex flex-wrap gap-1 rounded-lg bg-slate-900 p-1">
             {p.providers.map((x) => (
               <button
                 key={x.id}
@@ -71,7 +109,7 @@ export default function ScriptPanel(p: Props) {
                   setV({ provider: x.id, voice: x.voices[0]?.id ?? v.voice })
                 }
                 title={x.ok ? x.label : x.error}
-                className={`flex-1 rounded-md px-2 py-1 transition ${
+                className={`min-w-[30%] flex-1 rounded-md px-2 py-1 text-[10px] transition ${
                   v.provider === x.id
                     ? 'bg-emerald-500/90 font-medium text-slate-950'
                     : 'text-slate-400 hover:text-slate-200'
@@ -83,6 +121,16 @@ export default function ScriptPanel(p: Props) {
             ))}
           </div>
         )}
+
+        {provider?.quota && (
+          <ProviderQuota
+            quota={provider.quota}
+            pending={p.script
+              .filter((l) => l.audioMs === undefined)
+              .reduce((n, l) => n + l.text.trim().length, 0)}
+          />
+        )}
+        {provider?.note && <p className="text-[10px] leading-relaxed text-slate-500">{provider.note}</p>}
 
         <label className="flex flex-col gap-1">
           <span className="text-slate-400">Voice</span>
@@ -204,9 +252,11 @@ export default function ScriptPanel(p: Props) {
         {provider?.ok === false && (
           <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] leading-relaxed text-amber-300">
             {provider.error}{' '}
-            {provider.id === 'gemini'
-              ? 'Put GEMINI_API_KEY in .env at the repo root (or apps/editor/.env) and restart the dev server.'
-              : 'Install it (dnf install espeak-ng) and restart the dev server.'}
+            {provider.id === 'local'
+              ? 'Install it (dnf install espeak-ng) and restart the dev server.'
+              : `Put ${
+                  provider.id === 'gemini' ? 'GEMINI_API_KEY' : 'ELEVENLABS_API_KEY'
+                } in .env at the repo root (or apps/editor/.env) and restart the dev server.`}
           </p>
         )}
         {p.error && (

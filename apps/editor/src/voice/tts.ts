@@ -26,6 +26,10 @@ export interface ProviderInfo {
   rate: boolean;
   /** Takes a free-text director's note. */
   direction: boolean;
+  /** Characters spent against a metered allowance. */
+  quota?: { used: number; limit: number };
+  /** Conditions attached to using it. */
+  note?: string;
 }
 
 export async function ttsProviders(): Promise<ProviderInfo[]> {

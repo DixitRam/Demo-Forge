@@ -204,7 +204,10 @@ function parseStyle(v: unknown): ProjectStyle {
       background: str(captions.background, d.captions.background),
     },
     voice: {
-      provider: voice.provider === 'gemini' ? 'gemini' : 'local',
+      provider:
+        voice.provider === 'gemini' || voice.provider === 'elevenlabs'
+          ? voice.provider
+          : 'local',
       voice: str(voice.voice, d.voice.voice),
       rate: num(voice.rate, d.voice.rate, 60, 450),
       direction: str(voice.direction, d.voice.direction),
