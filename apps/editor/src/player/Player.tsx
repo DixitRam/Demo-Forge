@@ -2,7 +2,7 @@ import type { ZoomKeyframe } from '@demoforge/core';
 import { useEffect, useRef } from 'react';
 import type { LoadedProject } from '../import/loadRecording.js';
 import { compose } from '../render/compose.js';
-import type { FrameStyle } from '../render/style.js';
+import { outputAspect, type FrameStyle } from '../render/style.js';
 
 /** Preview resolution; the exporter renders at the video's native size. */
 const PREVIEW_WIDTH = 1280;
@@ -27,14 +27,18 @@ export default function Player({ project, keyframes, style, onTime }: Props) {
     if (!canvas || !ctx) return;
 
     const { video, rec } = project;
-    const aspect = video.videoHeight / video.videoWidth || 9 / 16;
-    canvas.width = PREVIEW_WIDTH;
-    canvas.height = Math.round(PREVIEW_WIDTH * aspect);
 
     let frame = 0;
     const draw = (): void => {
       const t = video.currentTime * 1000;
       const cur = latest.current;
+      // Aspect can change while playing, so size the canvas in the loop.
+      const aspect = outputAspect(cur.style, video.videoWidth, video.videoHeight);
+      const h = Math.max(2, Math.round(PREVIEW_WIDTH / aspect));
+      if (canvas.width !== PREVIEW_WIDTH || canvas.height !== h) {
+        canvas.width = PREVIEW_WIDTH;
+        canvas.height = h;
+      }
       compose(ctx, canvas.width, canvas.height, {
         video,
         rec,

@@ -9,10 +9,7 @@
 
 import type { CursorState } from '@demoforge/core';
 import type { Stage } from './geometry.js';
-
-/** Cursor height as a fraction of the output height. Constant on screen: a
- *  real pointer does not grow when the view zooms in. */
-const SIZE_RATIO = 0.045;
+import type { CursorStyle } from './style.js';
 
 /** Classic arrow, as a unit path 0..1 tall, drawn from its tip. */
 const ARROW: Array<[number, number]> = [
@@ -30,15 +27,17 @@ export function drawCursor(
   stage: Stage,
   outH: number,
   cursor: CursorState,
+  style: CursorStyle,
 ): void {
   // Callers draw inside the frame's clip path, so a cursor panned off the
   // visible area is hidden for free.
   const { x, y } = stage.toStage(cursor.xNorm, cursor.yNorm);
-  const size = outH * SIZE_RATIO;
+  // Constant on screen: a real pointer does not grow when the view zooms in.
+  const size = outH * style.size;
 
   ctx.save();
 
-  if (cursor.clickPulse > 0) {
+  if (style.clicks && cursor.clickPulse > 0) {
     const p = cursor.clickPulse;
     ctx.beginPath();
     ctx.arc(x, y, size * (0.35 + (1 - p) * 1.1), 0, Math.PI * 2);
@@ -48,7 +47,7 @@ export function drawCursor(
   }
 
   // A small dip on click, so the press reads even without the ring.
-  const press = 1 - cursor.clickPulse * 0.12;
+  const press = 1 - (style.clicks ? cursor.clickPulse * 0.12 : 0);
   ctx.translate(x, y);
   ctx.scale(size * press, size * press);
 

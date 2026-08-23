@@ -11,7 +11,7 @@ import { cursorAt, evaluateZoom, type DemoRecording, type ZoomKeyframe } from '@
 import { drawBackground } from './drawBackground.js';
 import { drawCursor } from './drawCursor.js';
 import { stageGeometry, type Stage } from './geometry.js';
-import { unit, type FrameStyle } from './style.js';
+import { cursorMoveMs, unit, type FrameStyle } from './style.js';
 
 export interface ComposeOptions {
   /** The exporter seeks this same element frame by frame. */
@@ -21,8 +21,6 @@ export interface ComposeOptions {
   /** Playhead in ms, on the same clock as DemoEvent.t. */
   t: number;
   style: FrameStyle;
-  /** Draw the synthetic cursor. Defaults to true. */
-  cursor?: boolean;
 }
 
 export function compose(
@@ -76,7 +74,10 @@ export function compose(
   }
   // Inside the clip, so the cursor and its click ring cannot spill onto the
   // background frame.
-  if (o.cursor !== false) drawCursor(ctx, stage, h, cursorAt(o.rec, o.t));
+  const cur = o.style.cursor;
+  if (cur.show) {
+    drawCursor(ctx, stage, h, cursorAt(o.rec, o.t, { moveMs: cursorMoveMs(cur.smoothing) }), cur);
+  }
   ctx.restore();
 
   return stage;

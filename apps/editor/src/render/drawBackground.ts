@@ -1,4 +1,5 @@
 import type { FrameStyle } from './style.js';
+import { getWallpaper, paintWallpaper } from './wallpapers.js';
 
 export function drawBackground(
   ctx: CanvasRenderingContext2D,
@@ -28,7 +29,12 @@ export function drawBackground(
     return;
   }
 
-  // Wallpaper: cover the canvas, cropping the overflow.
+  if (bg.kind === 'wallpaper') {
+    paintWallpaper(ctx, w, h, getWallpaper(bg.id));
+    return;
+  }
+
+  // Uploaded image: cover the canvas, cropping the overflow.
   const img = bg.image;
   const iw = img.naturalWidth || 1;
   const ih = img.naturalHeight || 1;

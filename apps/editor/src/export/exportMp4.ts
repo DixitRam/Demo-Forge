@@ -18,7 +18,7 @@ import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
 import type { DemoRecording, ZoomKeyframe } from '@demoforge/core';
 import { compose } from '../render/compose.js';
-import type { FrameStyle } from '../render/style.js';
+import { outputAspect, type FrameStyle } from '../render/style.js';
 
 /** Cap the long edge; a 4K screen recording is not worth a 4K wasm encode. */
 const MAX_LONG_EDGE = 1920;
@@ -41,11 +41,28 @@ export interface ExportOptions {
   signal?: AbortSignal;
 }
 
-function outputSize(video: HTMLVideoElement): { w: number; h: number } {
-  const scale = Math.min(1, MAX_LONG_EDGE / Math.max(video.videoWidth, video.videoHeight));
+/**
+ * Size the output frame for the chosen aspect, keeping the recording at its
+ * native resolution inside it (so a 9:16 frame around a 16:9 capture adds
+ * background rather than throwing away pixels), then cap the long edge.
+ */
+export function outputSize(
+  videoW: number,
+  videoH: number,
+  style: FrameStyle,
+): { w: number; h: number } {
+  const aspect = outputAspect(style, videoW, videoH);
+  const videoAspect = videoW / (videoH || 1);
+  let w = aspect >= videoAspect ? videoH * aspect : videoW;
+  let h = aspect >= videoAspect ? videoH : videoW / aspect;
+
+  const scale = Math.min(1, MAX_LONG_EDGE / Math.max(w, h));
+  w *= scale;
+  h *= scale;
+
   // H.264 needs even dimensions.
-  const even = (n: number): number => Math.max(2, Math.round((n * scale) / 2) * 2);
-  return { w: even(video.videoWidth), h: even(video.videoHeight) };
+  const even = (n: number): number => Math.max(2, Math.round(n / 2) * 2);
+  return { w: even(w), h: even(h) };
 }
 
 function seek(video: HTMLVideoElement, seconds: number): Promise<void> {
@@ -76,7 +93,7 @@ function toJpeg(canvas: HTMLCanvasElement): Promise<Blob> {
 
 export async function exportMp4(o: ExportOptions): Promise<Blob> {
   const { rec, video, keyframes, style, fps } = o;
-  const { w, h } = outputSize(video);
+  const { w, h } = outputSize(video.videoWidth, video.videoHeight, style);
 
   const canvas = document.createElement('canvas');
   canvas.width = w;

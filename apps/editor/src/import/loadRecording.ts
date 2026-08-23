@@ -6,6 +6,7 @@ export interface LoadedProject {
   videoUrl: string;
   /** The original file, kept so the exporter can mux its audio track back in. */
   media: Blob;
+  mediaName: string;
   warning?: string;
 }
 
@@ -66,7 +67,6 @@ export async function loadBundle(files: File[]): Promise<LoadedProject> {
 
   // Timing risk #1: trust the decoded video over what the recorder claimed.
   const { rec, warning } = reconcileTimebase(parsed, await realDurationMs(video));
-  return warning
-    ? { rec, video, videoUrl, media, warning }
-    : { rec, video, videoUrl, media };
+  const base = { rec, video, videoUrl, media, mediaName: media.name };
+  return warning ? { ...base, warning } : base;
 }

@@ -36,6 +36,34 @@ pnpm -C apps/editor dev
    drag the pills to move or resize them, add and delete, restyle the frame.
 4. **Export.** Render to MP4 in the browser via ffmpeg.wasm.
 
+## Editor
+
+An icon rail on the right opens five panels:
+
+| Panel | What it does |
+| --- | --- |
+| Background | Image / Colour / Gradient tabs — 18 generated wallpapers, custom upload, gradient presets with editable stops and angle |
+| Zoom | Auto-zoom toggle, per-zoom or global scale, re-plan from the click log |
+| Effects | Padding, corner radius, shadow blur / offset / strength |
+| Layout | Output aspect — Original, 16:9, 9:16, 1:1, 4:3, 4:5 |
+| Cursor | Show, click pulse, size, smoothing |
+
+The timeline has a scrubbable ruler with amber marks at every logged click, a
+zoom lane of draggable pills, and a clip lane. **Ctrl+Scroll** zooms the view
+about the pointer, **Shift+Scroll** pans, and the window follows the playhead.
+
+| Key | |
+| --- | --- |
+| `Space` | play / pause |
+| `Z` | add a zoom at the playhead |
+| `Delete` | remove the selected zoom |
+| `←` `→` | step one frame (hold `Shift` for a second) |
+| `Home` `End` | jump to start / end |
+
+Wallpapers are generated, not shipped — a base colour plus soft radial blobs,
+painted by one function used for both the picker swatch and the full frame, so
+the swatch cannot lie and there are no binary assets in the repo.
+
 ## The architecture contract
 
 Everything flows through one type, `DemoRecording`, defined once in

@@ -1,17 +1,52 @@
 import { useEffect, useState } from 'react';
+import {
+  IconEnd,
+  IconPause,
+  IconPlay,
+  IconStart,
+  IconStepBack,
+  IconStepFwd,
+} from '../panels/icons.js';
+import { ASPECT_PRESETS, type FrameStyle } from '../render/style.js';
+
+const STEP_MS = 1000 / 30;
 
 interface Props {
   video: HTMLVideoElement;
   timeMs: number;
   durationMs: number;
+  style: FrameStyle;
+  setStyle: (s: FrameStyle) => void;
 }
 
-function fmt(ms: number): string {
+/** m:ss.d — the tenth matters when you are lining a zoom up to a click. */
+export function fmt(ms: number): string {
   const s = Math.max(0, ms) / 1000;
-  return `${Math.floor(s / 60)}:${(s % 60).toFixed(2).padStart(5, '0')}`;
+  const m = Math.floor(s / 60);
+  return `${m}:${(s - m * 60).toFixed(1).padStart(4, '0')}`;
 }
 
-export default function Transport({ video, timeMs, durationMs }: Props) {
+function Btn({
+  onClick,
+  title,
+  children,
+}: {
+  onClick: () => void;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+    >
+      {children}
+    </button>
+  );
+}
+
+export default function Transport({ video, timeMs, durationMs, style, setStyle }: Props) {
   const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
@@ -23,28 +58,60 @@ export default function Transport({ video, timeMs, durationMs }: Props) {
     };
   }, [video]);
 
+  const seek = (ms: number): void => {
+    video.currentTime = Math.min(Math.max(0, ms), durationMs) / 1000;
+  };
+
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
+    <div className="flex items-center gap-2 border-b border-slate-800 px-4 py-2">
+      <Btn onClick={() => seek(0)} title="Start (Home)">
+        <IconStart />
+      </Btn>
+      <Btn onClick={() => seek(timeMs - STEP_MS)} title="Back one frame (←)">
+        <IconStepBack />
+      </Btn>
       <button
         onClick={() => (video.paused ? void video.play() : video.pause())}
-        className="w-20 rounded-md bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-white"
+        title="Play / pause (Space)"
+        className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-500 text-slate-950 hover:bg-sky-400"
       >
-        {playing ? 'Pause' : 'Play'}
+        {playing ? <IconPause /> : <IconPlay />}
       </button>
+      <Btn onClick={() => seek(timeMs + STEP_MS)} title="Forward one frame (→)">
+        <IconStepFwd />
+      </Btn>
+      <Btn onClick={() => seek(durationMs)} title="End (End)">
+        <IconEnd />
+      </Btn>
+
+      <span className="ml-1 font-mono text-xs whitespace-nowrap text-slate-300">
+        {fmt(timeMs)} <span className="text-slate-600">/ {fmt(durationMs)}</span>
+      </span>
+
       <input
         type="range"
         min={0}
         max={Math.max(1, durationMs)}
         step={10}
         value={Math.min(timeMs, durationMs)}
-        onChange={(e) => {
-          video.currentTime = Number(e.target.value) / 1000;
-        }}
-        className="flex-1 accent-sky-400"
+        onChange={(e) => seek(Number(e.target.value))}
+        className="mx-2 min-w-0 flex-1 accent-sky-400"
       />
-      <span className="w-28 text-right font-mono text-xs text-slate-400">
-        {fmt(timeMs)} / {fmt(durationMs)}
-      </span>
+
+      <select
+        value={style.aspect === null ? 'null' : String(style.aspect)}
+        onChange={(e) =>
+          setStyle({ ...style, aspect: e.target.value === 'null' ? null : Number(e.target.value) })
+        }
+        title="Aspect ratio"
+        className="rounded-md bg-slate-800 px-2 py-1 text-xs text-slate-200"
+      >
+        {ASPECT_PRESETS.map((p) => (
+          <option key={p.label} value={p.value === null ? 'null' : String(p.value)}>
+            {p.label}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

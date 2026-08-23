@@ -1,5 +1,6 @@
 import { DEFAULT_ZOOM_CONFIG, type ZoomKeyframe } from '@demoforge/core';
 import { setScale } from '../timeline/kfOps.js';
+import { Section, Slider, Toggle } from './controls.js';
 
 interface Props {
   keyframes: ZoomKeyframe[];
@@ -27,49 +28,46 @@ export default function ZoomPanel({
   };
 
   return (
-    <div className="flex flex-col gap-4 p-4 text-xs">
-      <label className="flex items-center justify-between">
-        <span className="font-medium text-slate-300">Auto-zoom</span>
-        <input
-          type="checkbox"
-          checked={enabled}
-          onChange={(e) => setEnabled(e.target.checked)}
-          className="accent-sky-400"
-        />
-      </label>
+    <div className="flex flex-col gap-5">
+      <Section label="Auto-zoom">
+        <Toggle label="Enabled" checked={enabled} onChange={setEnabled} />
+        <p className="text-[11px] leading-relaxed text-slate-500">
+          {keyframes.length} zoom{keyframes.length === 1 ? '' : 's'} planned from the click log.
+        </p>
+      </Section>
 
-      <label className="flex flex-col gap-1">
-        <span className="flex justify-between text-slate-400">
-          <span>{kf ? `Zoom ${selected! + 1} scale` : 'All zooms scale'}</span>
-          <span className="font-mono">{scale.toFixed(2)}×</span>
-        </span>
-        <input
-          type="range"
+      <Section label={kf ? `Zoom ${selected! + 1}` : 'All zooms'}>
+        <Slider
+          label="Scale"
+          value={scale}
           min={1}
           max={3}
           step={0.05}
-          value={scale}
-          onChange={(e) => applyScale(Number(e.target.value))}
-          className="accent-sky-400"
+          onChange={applyScale}
+          format={(v) => `${v.toFixed(2)}×`}
         />
-      </label>
-
-      {kf && (
-        <dl className="grid grid-cols-2 gap-1 font-mono text-[11px] text-slate-500">
-          <dt>start</dt>
-          <dd className="text-right text-slate-300">{(kf.tStart / 1000).toFixed(2)}s</dd>
-          <dt>end</dt>
-          <dd className="text-right text-slate-300">{(kf.tEnd / 1000).toFixed(2)}s</dd>
-          <dt>target</dt>
-          <dd className="text-right text-slate-300">
-            {kf.targetXNorm.toFixed(2)}, {kf.targetYNorm.toFixed(2)}
-          </dd>
-        </dl>
-      )}
+        {kf && (
+          <dl className="grid grid-cols-2 gap-y-1 font-mono text-[11px] text-slate-500">
+            <dt>start</dt>
+            <dd className="text-right text-slate-300">{(kf.tStart / 1000).toFixed(2)}s</dd>
+            <dt>end</dt>
+            <dd className="text-right text-slate-300">{(kf.tEnd / 1000).toFixed(2)}s</dd>
+            <dt>target</dt>
+            <dd className="text-right text-slate-300">
+              {kf.targetXNorm.toFixed(2)}, {kf.targetYNorm.toFixed(2)}
+            </dd>
+          </dl>
+        )}
+        {!kf && (
+          <p className="text-[11px] leading-relaxed text-slate-500">
+            Select a zoom on the timeline to edit it on its own.
+          </p>
+        )}
+      </Section>
 
       <button
         onClick={onReplan}
-        className="rounded bg-slate-800 px-2 py-1.5 text-slate-200 hover:bg-slate-700"
+        className="rounded-lg bg-slate-800 px-2 py-2 text-slate-200 hover:bg-slate-700"
       >
         Re-plan from click log
       </button>
