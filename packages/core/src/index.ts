@@ -49,13 +49,17 @@ export {
   estimateSpeechMs,
   lineDuration,
   scriptDuration,
+  MAX_STEP_SPAN_MS,
+  MIN_STEP_WINDOW_MS,
   STEP_MERGE_MS,
+  fitToBudget,
   scriptFromClicks,
   scriptFromSteps,
   scriptSteps,
   scriptOverruns,
   scriptSlotAt,
   sortScript,
+  spaceOutScript,
   wordBudget,
 } from './script.js';
 export type {

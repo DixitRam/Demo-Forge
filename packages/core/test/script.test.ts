@@ -7,12 +7,14 @@ import {
   scriptFromClicks,
   scriptOverruns,
   scriptSlotAt,
+  fitToBudget,
   scriptFromSteps,
   scriptSteps,
   sortScript,
   wordBudget,
   type ScriptLine,
 } from '../src/script.js';
+import type { DemoRecording } from '../src/types.js';
 import { SAMPLE } from './fixtures/sample-recording.js';
 
 describe('speech length', () => {
@@ -205,5 +207,77 @@ describe('scriptFromSteps', () => {
       { step: 0, text: 'first' },
     ]);
     expect(lines.map((l) => l.text)).toEqual(['first', 'second']);
+  });
+});
+
+describe('bursts of quick clicks become one step', () => {
+  const burst = (times: number[], texts: string[]): DemoRecording => ({
+    ...SAMPLE,
+    video: { ...SAMPLE.video, durationMs: 60_000 },
+    events: times.map((t, i) => ({
+      t,
+      type: 'click' as const,
+      xNorm: 0.5,
+      yNorm: 0.5,
+      el: { tag: 'button', text: texts[i]!, rect: { x: 0, y: 0, w: 60, h: 24 } },
+    })),
+  });
+
+  it('folds a run of clicks under the minimum window into the one that opened it', () => {
+    // The real failure: three parameter clicks ~1s apart, each budgeted 3 words.
+    const steps = scriptSteps(burst([40_000, 40_800, 42_200, 43_000], ['PM1', 'PM100', 'PM10', 'CO2']), 170);
+    const clicks = steps.filter((s) => s.action === 'click');
+    expect(clicks).toHaveLength(1);
+    expect(clicks[0]!.tMs).toBe(40_000);
+  });
+
+  it('keeps every label, so the writer still knows what was touched', () => {
+    const steps = scriptSteps(burst([40_000, 40_800, 42_200], ['PM1', 'PM100', 'PM10']), 170);
+    expect(steps.at(-1)!.text).toBe('PM1, PM100, PM10');
+  });
+
+  it('gives the merged step room for a real sentence', () => {
+    const steps = scriptSteps(burst([40_000, 40_800, 42_200], ['PM1', 'PM100', 'PM10']), 170);
+    // Previously three steps of 3 words; now one with the whole run to talk over.
+    expect(steps.at(-1)!.maxWords).toBeGreaterThan(10);
+  });
+
+  it('starts a new step anyway once a burst has run long enough', () => {
+    // Ten clicks a second apart: one line for a ten second stretch is too few.
+    const times = Array.from({ length: 10 }, (_, i) => 20_000 + i * 1000);
+    const steps = scriptSteps(burst(times, times.map((_, i) => `b${i}`)), 170);
+    expect(steps.filter((s) => s.action === 'click').length).toBeGreaterThan(1);
+  });
+
+  it('leaves well-spaced clicks alone', () => {
+    const steps = scriptSteps(burst([10_000, 20_000, 30_000], ['a', 'b', 'c']), 170);
+    expect(steps.filter((s) => s.action === 'click')).toHaveLength(3);
+  });
+
+  it('never folds the first click into the opening — the intro is its own beat', () => {
+    const steps = scriptSteps(burst([600, 20_000], ['Start', 'Next']), 170);
+    expect(steps[0]!.action).toBe('open');
+    expect(steps[0]!.text).toBeUndefined();
+    expect(steps[1]!.tMs).toBe(600);
+  });
+
+  it('does not repeat a label clicked twice in a burst', () => {
+    const steps = scriptSteps(burst([40_000, 40_600, 41_100], ['Next', 'Next', 'Done']), 170);
+    expect(steps.at(-1)!.text).toBe('Next, Done');
+  });
+});
+
+describe('fitToBudget', () => {
+  it('leaves a line that fits', () => {
+    expect(fitToBudget(' Open the filters. ', 5)).toBe('Open the filters.');
+  });
+
+  it('drops whole trailing sentences to fit', () => {
+    expect(fitToBudget('Open the filters. Then pick a range.', 4)).toBe('Open the filters.');
+  });
+
+  it('never truncates mid-sentence — a long line beats a broken one', () => {
+    const long = 'AirSense monitors air quality for facilities teams everywhere.';
+    expect(fitToBudget(long, 4)).toBe(long);
   });
 });

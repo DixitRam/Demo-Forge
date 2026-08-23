@@ -205,6 +205,21 @@ export interface ScriptStep {
 
 /** Two clicks closer than this are one step, not two things to say. */
 export const STEP_MERGE_MS = 500;
+/**
+ * A step with less room than this cannot hold a sentence, so it is folded
+ * into the one before it.
+ *
+ * Learned the hard way: three clicks a second apart got three-word budgets
+ * and a writer split one sentence across them — "Select PM one," / "PM one
+ * hundred," / "and PM ten." Each line was within budget and the result was
+ * unusable. A burst of quick clicks is one thing to say, not several.
+ */
+export const MIN_STEP_WINDOW_MS = 1500;
+/**
+ * However fast the clicking, start a new thing to say at least this often.
+ * Without it a minute of steady interaction folds into a single line.
+ */
+export const MAX_STEP_SPAN_MS = 6000;
 /** Nobody can say anything useful in less than this. */
 const MIN_WORDS = 3;
 /** Leave room to breathe rather than filling every window to the brim. */
@@ -245,8 +260,30 @@ export function scriptSteps(rec: DemoRecording, wpm = DEFAULT_VOICE.rate): Scrip
     });
   }
 
-  return moments.map((m, i) => {
-    const windowMs = (moments[i + 1]?.tMs ?? durationMs) - m.tMs;
+  // Fold each burst of quick clicks into the step that opened it, keeping
+  // every label so the writer still knows what was touched. The opening step
+  // never absorbs the first click: the intro is its own beat.
+  const merged: typeof moments = [];
+  // The gap that matters is to the PREVIOUS CLICK, not to the head of the
+  // burst — otherwise a steady stream of clicks breaks apart after one hop.
+  let lastT = -Infinity;
+  for (const m of moments) {
+    const prev = merged.at(-1);
+    const closeToLast = m.tMs - lastT < MIN_STEP_WINDOW_MS;
+    const stillRoom = !!prev && m.tMs - prev.tMs < MAX_STEP_SPAN_MS;
+    if (prev && prev.action !== 'open' && closeToLast && stillRoom) {
+      if (m.text && !prev.text?.split(', ').includes(m.text)) {
+        prev.text = prev.text ? `${prev.text}, ${m.text}` : m.text;
+      }
+      lastT = m.tMs;
+      continue;
+    }
+    merged.push({ ...m });
+    lastT = m.tMs;
+  }
+
+  return merged.map((m, i) => {
+    const windowMs = (merged[i + 1]?.tMs ?? durationMs) - m.tMs;
     return { index: i, ...m, windowMs, maxWords: wordBudget(windowMs, wpm) };
   });
 }
@@ -280,4 +317,52 @@ export function scriptFromSteps(
     lines.push({ tStart: step.action === 'open' ? 0 : Math.max(0, step.tMs - leadMs), text });
   }
   return sortScript(lines);
+}
+
+/**
+ * Bring an over-long line back within budget — but only at a sentence end.
+ *
+ * Chopping at the word count is how you get "AirSense monitors air quality
+ * readings for." A line that runs a little long still reads; a truncated one
+ * does not, and the timeline already flags and spaces overruns. So: drop
+ * whole sentences if that fits, otherwise leave it alone and say so.
+ */
+export function fitToBudget(text: string, maxWords: number): string {
+  const clean = text.trim();
+  const count = (t: string): number => t.split(/\s+/).filter(Boolean).length;
+  if (count(clean) <= maxWords) return clean;
+
+  const sentences = clean.match(/[^.!?]+[.!?]+/g);
+  if (sentences) {
+    let kept = '';
+    for (const sentence of sentences) {
+      const next = (kept + sentence).trim();
+      if (count(next) > maxWords) break;
+      kept = next;
+    }
+    if (kept) return kept;
+  }
+  return clean;
+}
+
+/**
+ * Push lines just far enough apart that nothing talks over anything else,
+ * keeping the first anchor where the author put it.
+ *
+ * Always run this on anything a writer produced. Even a writer told the word
+ * budget lands the odd line long, and overlapping speech is the one flaw that
+ * makes a narrated demo unusable.
+ */
+export function spaceOutScript(
+  lines: readonly ScriptLine[],
+  wpm = DEFAULT_VOICE.rate,
+  gapMs = MIN_LINE_GAP_MS,
+): ScriptLine[] {
+  const sorted = sortScript(lines);
+  let floor = 0;
+  return sorted.map((l) => {
+    const tStart = Math.max(l.tStart, floor);
+    floor = tStart + lineDuration(l, wpm) + gapMs;
+    return { ...l, tStart };
+  });
 }

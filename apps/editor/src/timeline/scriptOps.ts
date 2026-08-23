@@ -8,7 +8,11 @@
  * usually to shorten the words, not to shove the line.
  */
 
-import { lineDuration, sortScript, type ScriptLine } from '@demoforge/core';
+import { sortScript, type ScriptLine } from '@demoforge/core';
+
+// Lives in core: the CLI writer needs it too, and there must be exactly one
+// definition of "lines must not talk over each other".
+export { spaceOutScript } from '@demoforge/core';
 
 export function insertLine(
   lines: readonly ScriptLine[],
@@ -52,22 +56,4 @@ export function setLineText(
 
 export function deleteLine(lines: readonly ScriptLine[], index: number): ScriptLine[] {
   return lines.filter((_, i) => i !== index);
-}
-
-/**
- * Push every line just far enough apart that nothing talks over anything else,
- * keeping the first anchor where the author put it.
- */
-export function spaceOutScript(
-  lines: readonly ScriptLine[],
-  wpm: number,
-  gapMs: number,
-): ScriptLine[] {
-  const sorted = sortScript(lines);
-  let floor = 0;
-  return sorted.map((l) => {
-    const tStart = Math.max(l.tStart, floor);
-    floor = tStart + lineDuration(l, wpm) + gapMs;
-    return { ...l, tStart };
-  });
 }

@@ -18,6 +18,7 @@
  * ponytail: dev-server only, same as the voice providers, same upgrade path.
  */
 
+import { fitToBudget } from '@demoforge/core';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { resolve } from 'node:path';
 import { loadEnv, type Plugin } from 'vite';
@@ -124,33 +125,6 @@ export function describeStep(s: StepIn): string {
     `Step ${s.index} — at ${(s.tMs / 1000).toFixed(1)}s: ${what}. ` +
     `You have ${seconds}s before the next step: at most ${s.maxWords} words.`
   );
-}
-
-/**
- * Bring an over-long line back within budget — but only at a sentence end.
- *
- * Chopping at the word count is how you get "AirSense monitors air quality
- * readings for." A line that runs a little long still reads; a truncated one
- * does not, and the panel already flags and spaces overruns. So: drop whole
- * sentences if that fits, otherwise leave it alone and let the timeline say
- * so.
- */
-export function fitToBudget(text: string, maxWords: number): string {
-  const clean = text.trim();
-  const count = (t: string): number => t.split(/\s+/).filter(Boolean).length;
-  if (count(clean) <= maxWords) return clean;
-
-  const sentences = clean.match(/[^.!?]+[.!?]+/g);
-  if (sentences) {
-    let kept = '';
-    for (const sentence of sentences) {
-      const next = (kept + sentence).trim();
-      if (count(next) > maxWords) break;
-      kept = next;
-    }
-    if (kept) return kept;
-  }
-  return clean;
 }
 
 /** Overload is transient and this is one request, so it is ours to sit out. */

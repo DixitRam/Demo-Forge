@@ -1,7 +1,8 @@
 import { scriptSteps } from '@demoforge/core';
 import type { DemoRecording } from '@demoforge/core';
 import { describe, expect, it } from 'vitest';
-import { describeStep, fitToBudget, thinFrames } from '../vite-script.js';
+import { fitToBudget } from '@demoforge/core';
+import { describeStep, thinFrames } from '../vite-script.js';
 import { frameTimeMs } from '../src/voice/writeScript.js';
 
 describe('fitToBudget', () => {
