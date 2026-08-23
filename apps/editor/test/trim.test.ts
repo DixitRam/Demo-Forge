@@ -9,7 +9,7 @@ import {
   type DemoRecording,
 } from '@demoforge/core';
 import { describe, expect, it } from 'vitest';
-import { audioFilter, frameTimes } from '../src/export/exportMp4.js';
+import { audioFilter, frameTimes, mixFilter } from '../src/export/exportMp4.js';
 
 const DUR = 14_000;
 
@@ -86,7 +86,7 @@ describe('audioFilter', () => {
     expect(f).toContain('atrim=0.000:3.000');
     expect(f).toContain('atrim=6.000:9.000');
     expect(f).toContain('atrim=11.000:14.000');
-    expect(f).toContain('[a0][a1][a2]concat=n=3:v=0:a=1[aout]');
+    expect(f).toContain('[x1_0][x1_1][x1_2]concat=n=3:v=0:a=1[aout]');
   });
 
   it('resets each segment to zero so they butt together', () => {
@@ -99,5 +99,44 @@ describe('audioFilter', () => {
     const cuts = normalizeCuts([{ tStart: 0, tEnd: 2000 }], DUR);
     expect(audioFilter(cuts, DUR)).toContain('atrim=2.000:14.000');
     expect(frameTimes(cuts, DUR, 30)[0]).toBe(2000);
+  });
+});
+
+describe('mixFilter', () => {
+  const opts = { tabAudio: true, narration: true, duck: 0.25 };
+
+  it('is nothing at all when there is neither track', () => {
+    expect(mixFilter(CUTS, DUR, { ...opts, tabAudio: false, narration: false })).toBeNull();
+  });
+
+  it('is the plain splice when there is no narration', () => {
+    const f = mixFilter(CUTS, DUR, { ...opts, narration: false })!;
+    expect(f).toBe(audioFilter(CUTS, DUR));
+    expect(f).not.toContain('amix');
+    expect(f).not.toContain('volume');
+  });
+
+  it('splices the narration through the same cuts as the picture', () => {
+    const f = mixFilter(CUTS, DUR, { ...opts, tabAudio: false })!;
+    // Narration is input 2 and gets the identical trim points.
+    expect(f).toContain('[2:a]atrim=0.000:3.000');
+    expect(f).toContain('[2:a]atrim=6.000:9.000');
+    expect(f).toContain('[x2_0][x2_1][x2_2]concat=n=3:v=0:a=1[aout]');
+  });
+
+  it('ducks the recording under the voice and mixes without renormalising', () => {
+    const f = mixFilter(CUTS, DUR, opts)!;
+    expect(f).toContain('volume=0.250[aorig]');
+    expect(f).toContain('[aorig][anarr]amix=inputs=2:normalize=0');
+    // Exactly one output label, or ffmpeg has nothing to map.
+    expect((f.match(/\[aout\]/g) ?? []).length).toBe(1);
+  });
+
+  it('keeps the two inputs streams apart', () => {
+    const f = mixFilter(CUTS, DUR, opts)!;
+    expect((f.match(/x1_/g) ?? []).length).toBeGreaterThan(0);
+    expect((f.match(/x2_/g) ?? []).length).toBeGreaterThan(0);
+    // A shared tag would make the graph ambiguous.
+    expect(f).not.toContain('[a0]');
   });
 });

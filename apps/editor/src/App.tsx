@@ -12,6 +12,8 @@ import Transport from './player/Transport.js';
 import { useProject } from './state/useProject.js';
 import { setTarget } from './timeline/kfOps.js';
 import Timeline, { type Selection } from './timeline/Timeline.js';
+import NarrationTrack from './voice/NarrationTrack.js';
+import { useVoice } from './voice/useVoice.js';
 
 const FRAME_MS = 1000 / 30;
 
@@ -24,6 +26,8 @@ export default function App() {
     setCaptions,
     cuts,
     setCuts,
+    script,
+    setScript,
     style,
     setStyle,
     load,
@@ -37,11 +41,13 @@ export default function App() {
   const [addZoom, setAddZoom] = useState(0);
   const [addCaption, setAddCaption] = useState(0);
   const [addCut, setAddCut] = useState(0);
+  const [addLine, setAddLine] = useState(0);
 
   const active = useMemo(() => (zoomEnabled ? keyframes : []), [zoomEnabled, keyframes]);
 
   const video = project?.video;
   const duration = project?.rec.video.durationMs ?? 0;
+  const voice = useVoice(duration);
   const seek = (ms: number): void => {
     if (video) video.currentTime = Math.min(Math.max(0, ms), duration) / 1000;
   };
@@ -52,6 +58,8 @@ export default function App() {
       setKeyframes(keyframes.filter((_, i) => i !== selection.index));
     else if (selection.kind === 'caption')
       setCaptions(captions.filter((_, i) => i !== selection.index));
+    else if (selection.kind === 'script')
+      setScript(script.filter((_, i) => i !== selection.index));
     else setCuts(cuts.filter((_, i) => i !== selection.index));
     setSelection(null);
   };
@@ -69,6 +77,7 @@ export default function App() {
         i: () => setCuts(normalizeCuts([...cuts, { tStart: 0, tEnd: timeMs }], duration)),
         o: () => setCuts(normalizeCuts([...cuts, { tStart: timeMs, tEnd: duration }], duration)),
         c: () => setAddCaption((n) => n + 1),
+        n: () => setAddLine((n) => n + 1),
         s: () => save(),
         ArrowLeft: () => seek(timeMs - FRAME_MS),
         ArrowRight: () => seek(timeMs + FRAME_MS),
@@ -81,7 +90,7 @@ export default function App() {
         Backspace: deleteSelected,
       }),
       // eslint-disable-next-line react-hooks/exhaustive-deps
-      [video, timeMs, duration, selection, keyframes, captions, cuts, save],
+      [video, timeMs, duration, selection, keyframes, captions, cuts, script, save],
     ),
   );
 
@@ -125,6 +134,7 @@ export default function App() {
           captions={captions}
           cuts={cuts}
           style={style}
+          narration={voice.narration}
         />
       </header>
 
@@ -172,6 +182,11 @@ export default function App() {
             />
           )}
         </main>
+        <NarrationTrack
+          video={project.video}
+          url={voice.narrationUrl}
+          gain={style.voice.gain}
+        />
         <Sidebar
           rec={project.rec}
           style={style}
@@ -180,6 +195,14 @@ export default function App() {
           setKeyframes={setKeyframes}
           captions={captions}
           setCaptions={setCaptions}
+          script={script}
+          setScript={setScript}
+          onSeek={seek}
+          voiceStatus={voice.status}
+          voiceProgress={voice.progress}
+          voiceError={voice.error}
+          hasNarration={voice.narration !== null}
+          onGenerateVoice={() => void voice.generate(script, style.voice).then(setScript)}
           selection={selection}
           onSelect={setSelection}
           timeMs={timeMs}
@@ -209,6 +232,9 @@ export default function App() {
           setCaptions={setCaptions}
           cuts={cuts}
           setCuts={setCuts}
+          script={script}
+          setScript={setScript}
+          wpm={style.voice.rate}
           timeMs={timeMs}
           onSeek={seek}
           selection={selection}
@@ -217,6 +243,7 @@ export default function App() {
           addZoomSignal={addZoom}
           addCaptionSignal={addCaption}
           addCutSignal={addCut}
+          addLineSignal={addLine}
         />
       </footer>
     </div>

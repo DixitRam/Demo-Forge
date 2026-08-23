@@ -4,6 +4,7 @@ import {
   type CaptionCue,
   type ProjectStyle,
   type CutRegion,
+  type ScriptLine,
   type ZoomKeyframe,
 } from '@demoforge/core';
 import { useCallback, useState } from 'react';
@@ -15,6 +16,7 @@ export function useProject() {
   const [keyframes, setKeyframes] = useState<ZoomKeyframe[]>([]);
   const [captions, setCaptions] = useState<CaptionCue[]>([]);
   const [cuts, setCuts] = useState<CutRegion[]>([]);
+  const [script, setScript] = useState<ScriptLine[]>([]);
   const [style, setStyle] = useState<ProjectStyle>(DEFAULT_STYLE);
 
   const load = useCallback((p: LoadedProject) => {
@@ -22,6 +24,7 @@ export function useProject() {
     setKeyframes(p.zooms);
     setCaptions(p.captions);
     setCuts(p.cuts);
+    setScript(p.script);
     setStyle(p.style);
   }, []);
 
@@ -36,7 +39,13 @@ export function useProject() {
    */
   const save = useCallback(() => {
     if (!project) return;
-    const doc = createProject(project.rec, project.mediaName, keyframes, captions, cuts, style);
+    const doc = createProject(project.rec, project.mediaName, {
+      zooms: keyframes,
+      captions,
+      cuts,
+      script,
+      style,
+    });
     const url = URL.createObjectURL(
       new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' }),
     );
@@ -45,7 +54,7 @@ export function useProject() {
     a.download = `${project.mediaName.replace(/\.[^.]+$/, '') || 'demo'}.dfp.json`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [project, keyframes, captions, cuts, style]);
+  }, [project, keyframes, captions, cuts, script, style]);
 
   return {
     project,
@@ -55,6 +64,8 @@ export function useProject() {
     setCaptions,
     cuts,
     setCuts,
+    script,
+    setScript,
     style,
     setStyle,
     load,

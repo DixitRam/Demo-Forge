@@ -23,6 +23,7 @@ import {
   type CaptionCue,
   type CutRegion,
   type DemoRecording,
+  type VoiceStyle,
   type ZoomKeyframe,
 } from '@demoforge/core';
 import { compose } from '../render/compose.js';
@@ -42,6 +43,9 @@ export interface ExportOptions {
   video: HTMLVideoElement;
   /** The original bundle file, so the audio track can be muxed back in. */
   media: Blob;
+  /** Narration mixdown in SOURCE time, or null. Spliced like the tab audio. */
+  narration: Blob | null;
+  voice: VoiceStyle;
   keyframes: readonly ZoomKeyframe[];
   captions: readonly CaptionCue[];
   cuts: readonly CutRegion[];
@@ -96,22 +100,62 @@ export function frameTimes(
 }
 
 /**
- * Splice the source audio to match the cuts: trim each kept run out of the
- * input and concat them. Returns null when there is nothing to splice.
+ * Splice one input's audio to match the cuts: trim each kept run out of it and
+ * concat them. Returns null when there is nothing to splice.
  *
  * Doing this as a filter graph rather than decoding and re-splicing in the
  * browser keeps the whole audio path inside ffmpeg, where it is already going.
+ * The narration mixdown is in source time for exactly this reason — it goes
+ * through the identical filter, with no idea that cuts exist.
  */
-export function audioFilter(cuts: readonly CutRegion[], durationMs: number): string | null {
+export function audioFilter(
+  cuts: readonly CutRegion[],
+  durationMs: number,
+  input = 1,
+  label = 'aout',
+  volume?: number,
+): string | null {
   const segs = keptSegments(cuts, durationMs);
   if (segs.length === 0) return null;
+  const tag = (i: number): string => `x${input}_${i}`;
   const parts = segs.map(
     (s, i) =>
-      `[1:a]atrim=${(s.start / 1000).toFixed(3)}:${(s.end / 1000).toFixed(3)},` +
-      `asetpts=N/SR/TB[a${i}]`,
+      `[${input}:a]atrim=${(s.start / 1000).toFixed(3)}:${(s.end / 1000).toFixed(3)},` +
+      `asetpts=N/SR/TB[${tag(i)}]`,
   );
-  const inputs = segs.map((_, i) => `[a${i}]`).join('');
-  return `${parts.join(';')};${inputs}concat=n=${segs.length}:v=0:a=1[aout]`;
+  const inputs = segs.map((_, i) => `[${tag(i)}]`).join('');
+  const joined = `${inputs}concat=n=${segs.length}:v=0:a=1`;
+  return volume === undefined
+    ? `${parts.join(';')};${joined}[${label}]`
+    : `${parts.join(';')};${joined}[${label}_raw];[${label}_raw]volume=${volume.toFixed(3)}[${label}]`;
+}
+
+/**
+ * The full audio graph: the captured tab audio, the narration, or both mixed
+ * with the recording ducked underneath the voice.
+ *
+ * ponytail: a constant duck, not a sidechain compressor. It is one number and
+ * it is right for a demo where the tab audio is ambience; swap in
+ * `sidechaincompress` if the recording ever carries something worth hearing.
+ */
+export function mixFilter(
+  cuts: readonly CutRegion[],
+  durationMs: number,
+  opts: { tabAudio: boolean; narration: boolean; duck: number },
+): string | null {
+  const src = opts.tabAudio
+    ? audioFilter(cuts, durationMs, 1, 'aorig', opts.narration ? opts.duck : undefined)
+    : null;
+  const nar = opts.narration ? audioFilter(cuts, durationMs, 2, 'anarr') : null;
+
+  if (src && nar) {
+    return (
+      `${src};${nar};[aorig][anarr]` +
+      `amix=inputs=2:normalize=0:duration=longest:dropout_transition=0[aout]`
+    );
+  }
+  if (nar) return nar.replace(/\[anarr\]$/, '[aout]');
+  return src?.replace(/\[aorig\]$/, '[aout]') ?? null;
 }
 
 function seek(video: HTMLVideoElement, seconds: number): Promise<void> {
@@ -172,6 +216,7 @@ export async function exportMp4(o: ExportOptions): Promise<Blob> {
     }
 
     await ffmpeg.writeFile('source', await fetchFile(o.media));
+    if (o.narration) await ffmpeg.writeFile('narration.wav', await fetchFile(o.narration));
 
     ffmpeg.on('progress', ({ progress }) => o.onProgress('Encoding', Math.min(1, progress)));
     o.onProgress('Encoding', 0);
@@ -187,6 +232,7 @@ export async function exportMp4(o: ExportOptions): Promise<Blob> {
       'f%06d.jpg',
       '-i',
       'source',
+      ...(o.narration ? ['-i', 'narration.wav'] : []),
     ];
     const encode = [
       '-c:v',
@@ -202,8 +248,7 @@ export async function exportMp4(o: ExportOptions): Promise<Blob> {
       'out.mp4',
     ];
 
-    const filter = audioFilter(cuts, rec.video.durationMs);
-    const withAudio = [
+    const withAudio = (filter: string | null): string[] => [
       ...video_args,
       ...(filter ? ['-filter_complex', filter, '-map', '0:v', '-map', '[aout]'] : []),
       '-c:a',
@@ -213,9 +258,28 @@ export async function exportMp4(o: ExportOptions): Promise<Blob> {
       ...encode,
     ];
 
-    // A source with no audio track makes the filter graph unresolvable, and
-    // we cannot probe for one from wasm. Try with audio, fall back silently.
-    let code = await ffmpeg.exec(withAudio);
+    // We cannot probe the source for an audio track from wasm, and a graph
+    // that references one it does not have is unresolvable. So: ask for
+    // everything, and on failure drop the part we are unsure of. The
+    // narration is our own file, so it is the one input we know exists.
+    const duck = o.voice.duck;
+    const attempts = [
+      mixFilter(cuts, rec.video.durationMs, {
+        tabAudio: true,
+        narration: !!o.narration,
+        duck,
+      }),
+      ...(o.narration
+        ? [mixFilter(cuts, rec.video.durationMs, { tabAudio: false, narration: true, duck })]
+        : []),
+    ];
+
+    let code = 1;
+    for (const [i, filter] of attempts.entries()) {
+      if (i > 0) o.onProgress('Encoding (voice only)', 0);
+      code = await ffmpeg.exec(withAudio(filter));
+      if (code === 0) break;
+    }
     if (code !== 0) {
       o.onProgress('Encoding (no audio)', 0);
       code = await ffmpeg.exec([...video_args, '-map', '0:v', '-an', ...encode]);

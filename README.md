@@ -20,10 +20,13 @@ scripts/            make-fixture.sh — synthetic bundle with known coordinates
 
 ```sh
 pnpm install
-pnpm -r test                  # 66 tests
+pnpm -r test                  # 178 tests
 pnpm -C apps/extension build  # then load apps/extension/dist unpacked in Chrome
 pnpm -C apps/editor dev
 ```
+
+Narration needs `espeak-ng` on `PATH` (`dnf install espeak-ng`). Nothing else
+does — the editor tells you if it is missing and everything else keeps working.
 
 ## The workflow
 
@@ -38,10 +41,11 @@ pnpm -C apps/editor dev
 
 ## Editor
 
-An icon rail on the right opens five panels:
+An icon rail on the right opens six panels:
 
 | Panel | What it does |
 | --- | --- |
+| Script & voice | Narration lines on the timeline, drafted from the click log or written by hand, spoken by a local TTS |
 | Background | Image / Colour / Gradient tabs — 18 generated wallpapers, custom upload, gradient presets with editable stops and angle |
 | Zoom | Auto-zoom toggle, per-zoom or global scale, re-plan from the click log |
 | Captions | Add at the playhead, draft a set from the click log, edit text, position / size / colour |
@@ -85,6 +89,7 @@ about the pointer, **Shift+Scroll** pans, and the window follows the playhead.
 | `Space` | play / pause |
 | `Z` | add a zoom at the playhead |
 | `C` | add a caption at the playhead |
+| `N` | add a narration line at the playhead |
 | `S` | save the project |
 | `T` | cut a section out at the playhead |
 | `I` `O` | cut everything before / after the playhead |
@@ -96,6 +101,32 @@ about the pointer, **Shift+Scroll** pans, and the window follows the playhead.
 Wallpapers are generated, not shipped — a base colour plus soft radial blobs,
 painted by one function used for both the picker swatch and the full frame, so
 the swatch cannot lie and there are no binary assets in the repo.
+
+## Narration
+
+A **script** is a list of lines, each anchored to a source timestamp on the
+same clock as everything else. **From clicks** drafts one per step out of the
+element text already in the log — no AI, no transcript — and you edit the words
+from there. **Generate voiceover** speaks every line that has changed, measures
+how long it actually took, and lays the results onto one track.
+
+The mixdown plays in the preview (the captured tab audio stays muted there) and
+is muxed into the export with the recording ducked underneath the voice.
+
+A few things follow from how it is wired:
+
+- **Audio is never saved.** A project file holds the words; speech is
+  regenerated from them. That keeps a project a few kilobytes instead of
+  megabytes of base64, and means editing a line invalidates only that line.
+- **The mixdown is in source time**, so cuts splice it through the exact same
+  filter as the tab audio. Nothing in the narration path knows what a cut is.
+- **A line's length is its speech**, not something you drag. Until it has been
+  spoken the timeline uses a word-count estimate, marked `est.`. If lines start
+  talking over each other the panel says so and offers to space them out.
+- **The provider is one function.** Today it is `POST /api/tts` in the Vite dev
+  server shelling out to espeak-ng (`apps/editor/vite-tts.ts`) — robotic,
+  instant, offline. Swapping in ElevenLabs means replacing what answers that
+  request; the mixdown, the timeline and the exporter do not change.
 
 ## Saving: the project file
 
@@ -121,11 +152,15 @@ captions, write it back, and the editor will render exactly that.
   "captions": [
     { "tStart": 2000, "tEnd": 4200, "text": "Click \"Add Widget\"" }
   ],
+  "script": [                          // narration; text only, audio is regenerated
+    { "tStart": 800, "text": "Start by clicking Add Widget.", "audioMs": 2100 }
+  ],
   "style": { "background": { "kind": "wallpaper", "id": "cobalt" }, "aspect": null,
              "padding": 0.05, "radius": 0.02, "shadow": { "blur": 0.05, "y": 0.018, "alpha": 0.5 },
              "cursor": { "show": true, "size": 0.045, "smoothing": 0.4, "clicks": true },
              "captions": { "size": 0.045, "position": "bottom", "color": "#ffffff",
-                           "background": "rgba(2,6,23,0.72)" } }
+                           "background": "rgba(2,6,23,0.72)" },
+             "voice": { "voice": "en-us+f3", "rate": 170, "gain": 1, "duck": 0.25 } }
 }
 ```
 
@@ -146,8 +181,13 @@ Notes for anything editing one by hand:
   sorted, clamped, merged when they overlap, and dropped when shorter than
   100 ms. A legacy `trim: {startMs, endMs}` (a span to *keep*) is migrated
   into the equivalent head and tail cuts.
-- Omitting `zooms`, `captions`, `cuts` or `style` entirely is fine; they
-  default.
+- `script` lines carry `audioMs` only as a cached measurement. Change `text`
+  and drop it — a stale length lays the timeline out for audio that no longer
+  exists. Lines may overlap; that is reported, not prevented.
+- `style.voice.duck` is what the captured recording drops to while the voice
+  is talking, `gain` is the voice's own level.
+- Omitting `zooms`, `captions`, `cuts`, `script` or `style` entirely is fine;
+  they default.
 
 ## The architecture contract
 
@@ -187,3 +227,8 @@ For recording-side timing, see `apps/extension/README.md`.
 - **ffmpeg.wasm export** holds every frame in memory until the encode runs.
   Fine for a 30 s demo; a server-side render is the upgrade path.
 - **Pill handles** stay inside the pill, so a very short zoom is fiddly to grab.
+- **The voice provider is dev-server only**, so a statically built editor has
+  none. Fine while this is a tool you run with `pnpm dev`; the fix is the same
+  backend the Phase 2 TODO already calls for.
+- **Ducking is a constant**, not a sidechain compressor — right when the tab
+  audio is ambience, wrong if it ever carries something worth hearing.

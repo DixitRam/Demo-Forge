@@ -11,19 +11,22 @@ import { SAMPLE } from './fixtures/sample-recording.js';
 
 const DUR = SAMPLE.video.durationMs;
 
-const project = createProject(
-  SAMPLE,
-  'recording.webm',
-  planZooms(SAMPLE),
-  [{ tStart: 1000, tEnd: 3000, text: 'Open the dashboard' }],
-  [{ tStart: 0, tEnd: 1000 }, { tStart: 12_000, tEnd: DUR }],
-);
+const project = createProject(SAMPLE, 'recording.webm', {
+  zooms: planZooms(SAMPLE),
+  captions: [{ tStart: 1000, tEnd: 3000, text: 'Open the dashboard' }],
+  cuts: [
+    { tStart: 0, tEnd: 1000 },
+    { tStart: 12_000, tEnd: DUR },
+  ],
+  script: [{ tStart: 500, text: 'Open the dashboard from the sidebar.' }],
+});
 
 describe('project round-trip', () => {
   it('survives JSON serialisation unchanged', () => {
     const back = parseProject(JSON.parse(JSON.stringify(project)));
     expect(back.zooms).toEqual(project.zooms);
     expect(back.captions).toEqual(project.captions);
+    expect(back.script).toEqual(project.script);
     expect(back.style).toEqual(project.style);
     expect(back.recording.events).toEqual(SAMPLE.events);
     expect(back.mediaName).toBe('recording.webm');

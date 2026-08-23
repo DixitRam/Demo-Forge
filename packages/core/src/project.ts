@@ -13,6 +13,7 @@
  */
 
 import { MIN_CUT_MS, normalizeCuts, type CutRegion } from './edits.js';
+import { DEFAULT_VOICE, sortScript, type ScriptLine, type VoiceStyle } from './script.js';
 import type { DemoRecording } from './types.js';
 import type { ZoomKeyframe } from './zoom-planner.js';
 
@@ -64,6 +65,7 @@ export interface ProjectStyle {
   shadow: { blur: number; y: number; alpha: number };
   cursor: CursorStyle;
   captions: CaptionStyle;
+  voice: VoiceStyle;
 }
 
 export interface DemoProject {
@@ -79,6 +81,11 @@ export interface DemoProject {
   captions: CaptionCue[];
   /** Spans of the source removed from the demo. Sorted, non-overlapping. */
   cuts: CutRegion[];
+  /**
+   * Narration, time-ordered. Text only — the speech is regenerated from it, so
+   * a project stays small and an agent can rewrite the words without audio.
+   */
+  script: ScriptLine[];
   style: ProjectStyle;
 }
 
@@ -90,15 +97,21 @@ export const DEFAULT_STYLE: ProjectStyle = {
   shadow: { blur: 0.05, y: 0.018, alpha: 0.5 },
   cursor: { show: true, size: 0.045, smoothing: 0.4, clicks: true },
   captions: { size: 0.045, position: 'bottom', color: '#ffffff', background: 'rgba(2,6,23,0.72)' },
+  voice: DEFAULT_VOICE,
 };
+
+export interface ProjectParts {
+  zooms?: ZoomKeyframe[];
+  captions?: CaptionCue[];
+  cuts?: CutRegion[];
+  script?: ScriptLine[];
+  style?: ProjectStyle;
+}
 
 export function createProject(
   recording: DemoRecording,
   mediaName: string,
-  zooms: ZoomKeyframe[] = [],
-  captions: CaptionCue[] = [],
-  cuts: CutRegion[] = [],
-  style: ProjectStyle = DEFAULT_STYLE,
+  parts: ProjectParts = {},
 ): DemoProject {
   return {
     format: PROJECT_FORMAT,
@@ -106,10 +119,11 @@ export function createProject(
     createdAt: recording.createdAt,
     mediaName,
     recording,
-    zooms,
-    captions,
-    cuts: normalizeCuts(cuts, recording.video.durationMs),
-    style,
+    zooms: parts.zooms ?? [],
+    captions: parts.captions ?? [],
+    cuts: normalizeCuts(parts.cuts ?? [], recording.video.durationMs),
+    script: sortScript(parts.script ?? []),
+    style: parts.style ?? DEFAULT_STYLE,
   };
 }
 
@@ -164,6 +178,7 @@ function parseStyle(v: unknown): ProjectStyle {
   const shadow = (s.shadow ?? {}) as Record<string, unknown>;
   const cursor = (s.cursor ?? {}) as Record<string, unknown>;
   const captions = (s.captions ?? {}) as Record<string, unknown>;
+  const voice = (s.voice ?? {}) as Record<string, unknown>;
   const aspect = s.aspect;
 
   return {
@@ -188,7 +203,32 @@ function parseStyle(v: unknown): ProjectStyle {
       color: str(captions.color, d.captions.color),
       background: str(captions.background, d.captions.background),
     },
+    voice: {
+      voice: str(voice.voice, d.voice.voice),
+      rate: num(voice.rate, d.voice.rate, 60, 450),
+      gain: num(voice.gain, d.voice.gain, 0, 2),
+      duck: num(voice.duck, d.voice.duck, 0, 1),
+    },
   };
+}
+
+function parseScript(v: unknown, durationMs: number): ScriptLine[] {
+  if (!Array.isArray(v)) return [];
+  return sortScript(
+    v
+      .map((raw) => {
+        const l = (raw ?? {}) as Record<string, unknown>;
+        const audioMs = num(l.audioMs, 0, 0);
+        return {
+          tStart: num(l.tStart, 0, 0, durationMs),
+          text: str(l.text, ''),
+          // A stale measurement is worse than none: it would lay the timeline
+          // out for audio that no longer matches the text.
+          ...(audioMs > 0 ? { audioMs } : {}),
+        };
+      })
+      .filter((l) => l.text.trim() !== ''),
+  );
 }
 
 function parseZooms(v: unknown, durationMs: number): ZoomKeyframe[] {
@@ -286,6 +326,7 @@ export function parseProject(value: unknown): DemoProject {
     zooms: parseZooms(p.zooms, durationMs),
     captions: parseCaptions(p.captions, durationMs),
     cuts: parseCuts(p.cuts, p.trim, durationMs),
+    script: parseScript(p.script, durationMs),
     style: parseStyle(p.style),
   };
 }

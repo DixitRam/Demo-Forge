@@ -42,11 +42,26 @@ export {
   sourceToEdited,
 } from './edits.js';
 export type { CutRegion, Segment } from './edits.js';
+export {
+  DEFAULT_DRAFT,
+  DEFAULT_VOICE,
+  MIN_LINE_GAP_MS,
+  estimateSpeechMs,
+  lineDuration,
+  scriptDuration,
+  scriptFromClicks,
+  scriptOverruns,
+  scriptSlotAt,
+  sortScript,
+} from './script.js';
+export type { ScriptDraftConfig, ScriptLine, VoiceStyle } from './script.js';
+
 export type {
   CaptionCue,
   CaptionStyle,
   CursorStyle,
   DemoProject,
+  ProjectParts,
   ProjectBackground,
   ProjectStyle,
 } from './project.js';

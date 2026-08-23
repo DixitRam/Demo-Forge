@@ -12,9 +12,18 @@ interface Props {
   captions: readonly CaptionCue[];
   cuts: readonly CutRegion[];
   style: FrameStyle;
+  /** Narration mixdown, if one has been generated. */
+  narration: Blob | null;
 }
 
-export default function ExportDialog({ project, keyframes, captions, cuts, style }: Props) {
+export default function ExportDialog({
+  project,
+  keyframes,
+  captions,
+  cuts,
+  style,
+  narration,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [fps, setFps] = useState(30);
   const [stage, setStage] = useState<string | null>(null);
@@ -32,6 +41,8 @@ export default function ExportDialog({ project, keyframes, captions, cuts, style
         rec: project.rec,
         video: project.video,
         media: project.media,
+        narration,
+        voice: style.voice,
         keyframes,
         captions,
         cuts,

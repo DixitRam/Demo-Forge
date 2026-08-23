@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import type { CaptionCue, DemoRecording, ZoomKeyframe } from '@demoforge/core';
+import type { CaptionCue, DemoRecording, ScriptLine, ZoomKeyframe } from '@demoforge/core';
 import type { FrameStyle } from '../render/style.js';
 import type { Selection } from '../timeline/Timeline.js';
 import BackgroundPanel from './BackgroundPanel.js';
@@ -7,12 +7,24 @@ import CaptionsPanel from './CaptionsPanel.js';
 import CursorPanel from './CursorPanel.js';
 import EffectsPanel from './EffectsPanel.js';
 import LayoutPanel from './LayoutPanel.js';
+import ScriptPanel from './ScriptPanel.js';
 import ZoomPanel from './ZoomPanel.js';
-import { IconCaption, IconCursor, IconImage, IconLayout, IconSliders, IconZoom } from './icons.js';
+import type { ProviderStatus } from '../voice/tts.js';
+import type { VoiceProgress } from '../voice/useVoice.js';
+import {
+  IconCaption,
+  IconCursor,
+  IconImage,
+  IconLayout,
+  IconScript,
+  IconSliders,
+  IconZoom,
+} from './icons.js';
 
-type PanelId = 'background' | 'zoom' | 'captions' | 'effects' | 'layout' | 'cursor';
+type PanelId = 'script' | 'background' | 'zoom' | 'captions' | 'effects' | 'layout' | 'cursor';
 
 const TABS: Array<{ id: PanelId; title: string; icon: ReactNode }> = [
+  { id: 'script', title: 'Script & voice', icon: <IconScript /> },
   { id: 'background', title: 'Background', icon: <IconImage /> },
   { id: 'zoom', title: 'Zoom', icon: <IconZoom /> },
   { id: 'captions', title: 'Captions', icon: <IconCaption /> },
@@ -29,6 +41,14 @@ interface Props {
   setKeyframes: (kfs: ZoomKeyframe[]) => void;
   captions: CaptionCue[];
   setCaptions: (c: CaptionCue[]) => void;
+  script: ScriptLine[];
+  setScript: (s: ScriptLine[]) => void;
+  onSeek: (ms: number) => void;
+  voiceStatus: ProviderStatus | null;
+  voiceProgress: VoiceProgress | null;
+  voiceError: string | null;
+  hasNarration: boolean;
+  onGenerateVoice: () => void;
   selection: Selection;
   onSelect: (s: Selection) => void;
   timeMs: number;
@@ -43,6 +63,7 @@ export default function Sidebar(p: Props) {
   const active = TABS.find((t) => t.id === open);
   const selZoom = p.selection?.kind === 'zoom' ? p.selection.index : null;
   const selCaption = p.selection?.kind === 'caption' ? p.selection.index : null;
+  const selLine = p.selection?.kind === 'script' ? p.selection.index : null;
 
   return (
     <div className="flex min-h-0">
@@ -59,6 +80,24 @@ export default function Sidebar(p: Props) {
             </button>
           </header>
           <div className="p-4">
+            {open === 'script' && (
+              <ScriptPanel
+                rec={p.rec}
+                script={p.script}
+                setScript={p.setScript}
+                style={p.style}
+                setStyle={p.setStyle}
+                selected={selLine}
+                onSelect={(i) => p.onSelect(i === null ? null : { kind: 'script', index: i })}
+                timeMs={p.timeMs}
+                onSeek={p.onSeek}
+                status={p.voiceStatus}
+                progress={p.voiceProgress}
+                error={p.voiceError}
+                hasNarration={p.hasNarration}
+                onGenerate={p.onGenerateVoice}
+              />
+            )}
             {open === 'background' && <BackgroundPanel style={p.style} setStyle={p.setStyle} />}
             {open === 'effects' && <EffectsPanel style={p.style} setStyle={p.setStyle} />}
             {open === 'layout' && (

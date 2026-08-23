@@ -17,6 +17,11 @@ const TONES = {
     off: 'border-red-500/50 bg-red-500/20 text-red-200 hover:bg-red-500/30',
     grip: 'bg-red-300/70',
   },
+  voice: {
+    on: 'border-violet-300 bg-violet-500/40 text-violet-50 ring-1 ring-violet-300/60',
+    off: 'border-violet-500/50 bg-violet-500/20 text-violet-200 hover:bg-violet-500/30',
+    grip: 'bg-violet-300/70',
+  },
   caption: {
     on: 'border-emerald-300 bg-emerald-500/40 text-emerald-50 ring-1 ring-emerald-300/60',
     off: 'border-emerald-500/50 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30',
@@ -35,6 +40,8 @@ interface Props {
   onSelect: () => void;
   onDrag: (mode: DragMode, deltaMs: number) => void;
   onDragEnd: () => void;
+  /** Off for a pill whose length is not the user's to set — speech, say. */
+  handles?: boolean;
 }
 
 export default function Pill({
@@ -48,6 +55,7 @@ export default function Pill({
   onSelect,
   onDrag,
   onDragEnd,
+  handles = true,
 }: Props) {
   const origin = useRef(0);
   const t = TONES[tone];
@@ -82,19 +90,23 @@ export default function Pill({
         selected ? t.on : t.off
       }`}
     >
-      <span
-        onPointerDown={begin('start')}
-        className={`h-full w-1.5 shrink-0 cursor-ew-resize ${t.grip}`}
-      />
+      {handles && (
+        <span
+          onPointerDown={begin('start')}
+          className={`h-full w-1.5 shrink-0 cursor-ew-resize ${t.grip}`}
+        />
+      )}
       {widthPx >= COMPACT_PX && (
         <span className="pointer-events-none flex min-w-0 items-center gap-1 truncate px-1">
           {label}
         </span>
       )}
-      <span
-        onPointerDown={begin('end')}
-        className={`h-full w-1.5 shrink-0 cursor-ew-resize ${t.grip}`}
-      />
+      {handles && (
+        <span
+          onPointerDown={begin('end')}
+          className={`h-full w-1.5 shrink-0 cursor-ew-resize ${t.grip}`}
+        />
+      )}
     </div>
   );
 }

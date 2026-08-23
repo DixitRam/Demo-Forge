@@ -8,6 +8,7 @@ import {
   type DemoRecording,
   type ProjectStyle,
   type CutRegion,
+  type ScriptLine,
   type ZoomKeyframe,
 } from '@demoforge/core';
 
@@ -22,6 +23,7 @@ export interface LoadedProject {
   zooms: ZoomKeyframe[];
   captions: CaptionCue[];
   cuts: CutRegion[];
+  script: ScriptLine[];
   style: ProjectStyle;
   warning?: string;
 }
@@ -101,6 +103,7 @@ export async function loadBundle(files: File[]): Promise<LoadedProject> {
     zooms: project ? project.zooms : planZooms(rec),
     captions: project ? project.captions : [],
     cuts: project ? project.cuts : [],
+    script: project ? project.script : [],
     style: project ? project.style : DEFAULT_STYLE,
   };
   return warning ? { ...base, warning } : base;

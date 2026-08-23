@@ -92,3 +92,11 @@ export const IconStepFwd = () => (
     <path d="m9 6 6 6-6 6" />
   </svg>
 );
+
+export const IconScript = () => (
+  <svg {...base}>
+    <path d="M6 3h9l5 5v13H6z" />
+    <path d="M15 3v5h5" />
+    <path d="M9 12h7M9 16h5" />
+  </svg>
+);

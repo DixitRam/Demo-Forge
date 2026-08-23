@@ -1,9 +1,10 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
+import { ttsPlugin } from './vite-tts.js';
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), ttsPlugin()],
   server: {
     // ffmpeg.wasm wants a cross-origin-isolated context for its threaded core.
     headers: {

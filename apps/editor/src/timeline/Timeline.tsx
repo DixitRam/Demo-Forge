@@ -1,18 +1,21 @@
 import {
   cutDuration,
+  lineDuration,
   normalizeCuts,
   type CaptionCue,
   type CutRegion,
   type DemoRecording,
+  type ScriptLine,
   type ZoomKeyframe,
 } from '@demoforge/core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { captionSlotAt, insertCaption, moveCaption } from './captionOps.js';
 import { applyDrag, freeSlotAt, insertZoom, snapWithin, type DragMode } from './kfOps.js';
+import { insertLine, moveLine } from './scriptOps.js';
 import Pill from './Pill.js';
 import { fullView, panView, revealTime, zoomView, type View } from './view.js';
 
-export type Selection = { kind: 'zoom' | 'caption' | 'cut'; index: number } | null;
+export type Selection = { kind: 'zoom' | 'caption' | 'cut' | 'script'; index: number } | null;
 
 const TICK_STEPS_MS = [
   100, 250, 500, 1000, 2000, 5000, 10_000, 15_000, 30_000, 60_000, 120_000, 300_000,
@@ -31,6 +34,10 @@ interface Props {
   setCaptions: (c: CaptionCue[]) => void;
   cuts: CutRegion[];
   setCuts: (c: CutRegion[]) => void;
+  script: ScriptLine[];
+  setScript: (s: ScriptLine[]) => void;
+  /** Words per minute, for laying out lines that have not been spoken yet. */
+  wpm: number;
   timeMs: number;
   onSeek: (ms: number) => void;
   selection: Selection;
@@ -40,6 +47,7 @@ interface Props {
   addZoomSignal: number;
   addCaptionSignal: number;
   addCutSignal: number;
+  addLineSignal: number;
 }
 
 function label(ms: number, sub: boolean): string {
@@ -57,6 +65,9 @@ export default function Timeline({
   setCaptions,
   cuts,
   setCuts,
+  script,
+  setScript,
+  wpm,
   timeMs,
   onSeek,
   selection,
@@ -65,10 +76,12 @@ export default function Timeline({
   addZoomSignal,
   addCaptionSignal,
   addCutSignal,
+  addLineSignal,
 }: Props) {
   const selZoom = selection?.kind === 'zoom' ? selection.index : null;
   const selCaption = selection?.kind === 'caption' ? selection.index : null;
   const selCut = selection?.kind === 'cut' ? selection.index : null;
+  const selLine = selection?.kind === 'script' ? selection.index : null;
   const duration = Math.max(1, rec.video.durationMs);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -148,6 +161,13 @@ export default function Timeline({
     );
   };
 
+  const lineBase = useRef<ScriptLine[] | null>(null);
+
+  const onLineDrag = (index: number, _mode: DragMode, deltaMs: number): void => {
+    lineBase.current ??= script;
+    setScript(moveLine(lineBase.current, index, deltaMs, duration));
+  };
+
   const cutBase = useRef<CutRegion[] | null>(null);
 
   const onCutDrag = (index: number, mode: DragMode, deltaMs: number): void => {
@@ -215,6 +235,22 @@ export default function Timeline({
     [cuts, duration, setCuts, onSelect],
   );
 
+  const addLineAt = useCallback(
+    (t: number): void => {
+      const next = insertLine(script, t, duration);
+      setScript(next);
+      onSelect({ kind: 'script', index: next.findIndex((l) => l.tStart === Math.min(Math.max(0, t), duration)) });
+    },
+    [script, duration, setScript, onSelect],
+  );
+
+  const lastLine = useRef(addLineSignal);
+  useEffect(() => {
+    if (addLineSignal === lastLine.current) return;
+    lastLine.current = addLineSignal;
+    addLineAt(timeMs);
+  }, [addLineSignal, addLineAt, timeMs]);
+
   const lastCut = useRef(addCutSignal);
   useEffect(() => {
     if (addCutSignal === lastCut.current) return;
@@ -251,6 +287,8 @@ export default function Timeline({
               setKeyframes(keyframes.filter((_, i) => i !== selection.index));
             } else if (selection.kind === 'caption') {
               setCaptions(captions.filter((_, i) => i !== selection.index));
+            } else if (selection.kind === 'script') {
+              setScript(script.filter((_, i) => i !== selection.index));
             } else {
               setCuts(cuts.filter((_, i) => i !== selection.index));
             }
@@ -260,6 +298,12 @@ export default function Timeline({
           className="rounded bg-slate-800 px-2 py-0.5 text-slate-200 hover:bg-slate-700 disabled:opacity-40"
         >
           Delete
+        </button>
+        <button
+          onClick={() => addLineAt(timeMs)}
+          className="rounded bg-slate-800 px-2 py-0.5 text-slate-200 hover:bg-slate-700"
+        >
+          + Line <kbd className="text-slate-500">N</kbd>
         </button>
         <button
           onClick={() => addCutAt(timeMs)}
@@ -290,6 +334,7 @@ export default function Timeline({
           <div className="flex h-8 items-center">cut</div>
           <div className="flex h-9 items-center">zoom</div>
           <div className="flex h-8 items-center">caption</div>
+          <div className="flex h-8 items-center">voice</div>
           <div className="flex h-7 items-center">clip</div>
         </div>
 
@@ -422,6 +467,41 @@ export default function Timeline({
             {captions.length === 0 && (
               <span className="pointer-events-none absolute inset-0 grid place-items-center text-[11px] text-slate-600">
                 Press C to add a caption
+              </span>
+            )}
+          </div>
+
+          <div
+            onPointerDown={() => onSelect(null)}
+            onDoubleClick={(e) => addLineAt(toMs(e.clientX))}
+            className="relative h-8 border-b border-slate-800/60 bg-slate-900/60"
+          >
+            {script.map((line, i) => {
+              const l = toPx(line.tStart);
+              const w = lineDuration(line, wpm) * pxPerMs;
+              if (l + w < -20 || l > width + 20) return null;
+              return (
+                <Pill
+                  key={i}
+                  tone="voice"
+                  leftPx={l}
+                  widthPx={w}
+                  pxPerMs={pxPerMs}
+                  selected={selLine === i}
+                  handles={false}
+                  title={`${line.text}${line.audioMs === undefined ? ' (length estimated)' : ''}`}
+                  label={line.text}
+                  onSelect={() => onSelect({ kind: 'script', index: i })}
+                  onDrag={(mode, delta) => onLineDrag(i, mode, delta)}
+                  onDragEnd={() => {
+                    lineBase.current = null;
+                  }}
+                />
+              );
+            })}
+            {script.length === 0 && (
+              <span className="pointer-events-none absolute inset-0 grid place-items-center text-[11px] text-slate-600">
+                Press N to add a narration line
               </span>
             )}
           </div>
