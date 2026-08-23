@@ -20,7 +20,7 @@ scripts/            make-fixture.sh — synthetic bundle with known coordinates
 
 ```sh
 pnpm install
-pnpm -r test                  # 199 tests
+pnpm -r test                  # 213 tests
 pnpm -C apps/extension build  # then load apps/extension/dist unpacked in Chrome
 pnpm -C apps/editor dev
 ```
@@ -30,7 +30,7 @@ which ones are available.
 
 - **espeak-ng (local)** — `dnf install espeak-ng`. Free, offline, robotic.
 - **Gemini AI** — copy `.env.example` to `.env` and put a key in
-  `GEMINI_API_KEY`. Sounds like a person. `.env` at the repo root or in
+  `GEMINI_API_KEY`. The same key writes the script. Sounds like a person. `.env` at the repo root or in
   `apps/editor/` both work; the key is read by the dev server only and never
   reaches the browser.
 
@@ -120,10 +120,32 @@ the swatch cannot lie and there are no binary assets in the repo.
 ## Narration
 
 A **script** is a list of lines, each anchored to a source timestamp on the
-same clock as everything else. **From clicks** drafts one per step out of the
-element text already in the log — no AI, no transcript — and you edit the words
-from there. **Generate voiceover** speaks every line that has changed, measures
-how long it actually took, and lays the results onto one track.
+same clock as everything else. There are two ways to get one.
+
+**Write the script with AI** is the good one. The editor breaks the demo into
+steps — an opening, then one per click — grabs a frame of the screen at each,
+rings the spot that was clicked, and sends the lot to a model along with how
+many seconds it has to talk at each step. It writes to that budget, naming
+what is actually on screen. Give it a sentence about what the demo is for and
+it gets markedly better; that brief is saved with the project.
+
+Two things the model is deliberately not trusted with:
+
+- **Timestamps.** It says which *step* a line belongs to; the editor decides
+  when that lands. Asked for milliseconds, a model returns plausible ones, and
+  plausible is not synchronised.
+- **Length.** Each step carries a word budget from its own window. An
+  over-long line is trimmed back to a sentence boundary, never mid-sentence —
+  a line that runs a little long still reads, a truncated one does not.
+
+Frames of your recording go to Google when you press it. Nothing else in the
+editor sends anything anywhere.
+
+**From clicks** is the offline fallback: one line per step from the element
+text already in the log, string templates, no network. Rough, but instant.
+
+**Generate voiceover** then speaks every line that has changed, measures how
+long it actually took, and lays the results onto one track.
 
 The mixdown plays in the preview (the captured tab audio stays muted there) and
 is muxed into the export with the recording ducked underneath the voice.
@@ -191,6 +213,7 @@ captions, write it back, and the editor will render exactly that.
   "version": 1,
   "mediaName": "recording.webm",       // referenced, not embedded
   "narrationName": "recording.narration.wav",   // ditto; "" when there is none
+  "brief": "AirSense is an air-quality dashboard for facilities teams.",
   "recording": { /* the DemoRecording from capture */ },
   "zooms": [
     { "tStart": 1500, "tEnd": 3700, "targetXNorm": 0.42, "targetYNorm": 0.31,
@@ -234,6 +257,9 @@ Notes for anything editing one by hand:
   exists. Lines may overlap; that is reported, not prevented.
 - `style.voice.duck` is what the captured recording drops to while the voice
   is talking, `gain` is the voice's own level.
+- `brief` is what the demo is about, in your words. It is context for whoever
+  writes the narration — the AI writer reads it — and it is worth keeping so
+  the next rewrite starts from the same understanding.
 - `narrationName` names the rendered voiceover sitting next to the project.
   The editor takes any dropped `.wav` as the narration, so the name is a hint
   rather than a requirement — files get renamed.

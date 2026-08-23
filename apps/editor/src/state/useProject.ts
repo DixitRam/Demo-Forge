@@ -17,6 +17,7 @@ export function useProject() {
   const [captions, setCaptions] = useState<CaptionCue[]>([]);
   const [cuts, setCuts] = useState<CutRegion[]>([]);
   const [script, setScript] = useState<ScriptLine[]>([]);
+  const [brief, setBrief] = useState('');
   const [style, setStyle] = useState<ProjectStyle>(DEFAULT_STYLE);
 
   const load = useCallback((p: LoadedProject) => {
@@ -25,6 +26,7 @@ export function useProject() {
     setCaptions(p.captions);
     setCuts(p.cuts);
     setScript(p.script);
+    setBrief(p.brief);
     setStyle(p.style);
   }, []);
 
@@ -54,6 +56,7 @@ export function useProject() {
         captions,
         cuts,
         script,
+        brief,
         narrationName,
         style,
       });
@@ -73,7 +76,7 @@ export function useProject() {
       );
       if (narration) download(narration, narrationName);
     },
-    [project, keyframes, captions, cuts, script, style],
+    [project, keyframes, captions, cuts, script, brief, style],
   );
 
   return {
@@ -86,6 +89,8 @@ export function useProject() {
     setCuts,
     script,
     setScript,
+    brief,
+    setBrief,
     style,
     setStyle,
     load,

@@ -26,6 +26,7 @@ export interface LoadedProject {
   captions: CaptionCue[];
   cuts: CutRegion[];
   script: ScriptLine[];
+  brief: string;
   style: ProjectStyle;
   warning?: string;
 }
@@ -110,6 +111,7 @@ export async function loadBundle(files: File[]): Promise<LoadedProject> {
     captions: project ? project.captions : [],
     cuts: project ? project.cuts : [],
     script: project ? project.script : [],
+    brief: project ? project.brief : '',
     style: project ? project.style : DEFAULT_STYLE,
   };
   return warning ? { ...base, warning } : base;

@@ -89,6 +89,12 @@ export interface DemoProject {
   /** Spans of the source removed from the demo. Sorted, non-overlapping. */
   cuts: CutRegion[];
   /**
+   * What this demo is about, in the author's words. Context for whoever — or
+   * whatever — writes the narration, and worth keeping so the next rewrite
+   * starts from the same understanding.
+   */
+  brief: string;
+  /**
    * Narration, time-ordered. Text only — the speech is regenerated from it, so
    * a project stays small and an agent can rewrite the words without audio.
    */
@@ -112,6 +118,7 @@ export interface ProjectParts {
   captions?: CaptionCue[];
   cuts?: CutRegion[];
   script?: ScriptLine[];
+  brief?: string;
   narrationName?: string;
   style?: ProjectStyle;
 }
@@ -131,6 +138,7 @@ export function createProject(
     zooms: parts.zooms ?? [],
     captions: parts.captions ?? [],
     cuts: normalizeCuts(parts.cuts ?? [], recording.video.durationMs),
+    brief: parts.brief ?? '',
     script: sortScript(parts.script ?? []),
     style: parts.style ?? DEFAULT_STYLE,
   };
@@ -341,6 +349,7 @@ export function parseProject(value: unknown): DemoProject {
     zooms: parseZooms(p.zooms, durationMs),
     captions: parseCaptions(p.captions, durationMs),
     cuts: parseCuts(p.cuts, p.trim, durationMs),
+    brief: str(p.brief, ''),
     script: parseScript(p.script, durationMs),
     style: parseStyle(p.style),
   };

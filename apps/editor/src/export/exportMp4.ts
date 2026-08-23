@@ -160,7 +160,8 @@ export function mixFilter(
   return src?.replace(/\[aorig\]$/, '[aout]') ?? null;
 }
 
-function seek(video: HTMLVideoElement, seconds: number): Promise<void> {
+/** Shared with the script writer, which seeks the same way to grab frames. */
+export function seek(video: HTMLVideoElement, seconds: number): Promise<void> {
   return new Promise((resolve, reject) => {
     const ok = (): void => {
       video.removeEventListener('error', bad);

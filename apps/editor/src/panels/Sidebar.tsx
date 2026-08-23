@@ -10,6 +10,7 @@ import LayoutPanel from './LayoutPanel.js';
 import ScriptPanel from './ScriptPanel.js';
 import ZoomPanel from './ZoomPanel.js';
 import type { ProviderInfo } from '../voice/tts.js';
+import type { WriterStatus } from '../voice/writeScript.js';
 import type { VoiceProgress } from '../voice/useVoice.js';
 import {
   IconCaption,
@@ -43,6 +44,12 @@ interface Props {
   setCaptions: (c: CaptionCue[]) => void;
   script: ScriptLine[];
   setScript: (s: ScriptLine[]) => void;
+  brief: string;
+  setBrief: (b: string) => void;
+  writer: WriterStatus | null;
+  writing: string | null;
+  writeError: string | null;
+  onWrite: () => void;
   onSeek: (ms: number) => void;
   voiceProviders: ProviderInfo[] | null;
   voiceProgress: VoiceProgress | null;
@@ -85,6 +92,12 @@ export default function Sidebar(p: Props) {
                 rec={p.rec}
                 script={p.script}
                 setScript={p.setScript}
+                brief={p.brief}
+                setBrief={p.setBrief}
+                writer={p.writer}
+                writing={p.writing}
+                writeError={p.writeError}
+                onWrite={p.onWrite}
                 style={p.style}
                 setStyle={p.setStyle}
                 selected={selLine}

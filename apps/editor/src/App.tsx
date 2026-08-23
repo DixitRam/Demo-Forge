@@ -14,6 +14,7 @@ import { setTarget } from './timeline/kfOps.js';
 import Timeline, { type Selection } from './timeline/Timeline.js';
 import NarrationTrack from './voice/NarrationTrack.js';
 import { useVoice } from './voice/useVoice.js';
+import { useWriter } from './voice/useWriter.js';
 
 const FRAME_MS = 1000 / 30;
 
@@ -28,6 +29,8 @@ export default function App() {
     setCuts,
     script,
     setScript,
+    brief,
+    setBrief,
     style,
     setStyle,
     load,
@@ -48,6 +51,7 @@ export default function App() {
   const video = project?.video;
   const duration = project?.rec.video.durationMs ?? 0;
   const voice = useVoice(duration);
+  const writer = useWriter();
 
   // A narration saved with the project plays straight away, and its lines go
   // back into the speech cache so editing one does not respeak them all.
@@ -207,6 +211,18 @@ export default function App() {
           setCaptions={setCaptions}
           script={script}
           setScript={setScript}
+          brief={brief}
+          setBrief={setBrief}
+          writer={writer.status}
+          writing={writer.stage}
+          writeError={writer.error}
+          onWrite={() => {
+            void writer.write(project.video, project.rec, brief, style.voice.rate).then((lines) => {
+              if (!lines) return;
+              setScript(lines);
+              setSelection(null);
+            });
+          }}
           onSeek={seek}
           voiceProviders={voice.providers}
           voiceProgress={voice.progress}

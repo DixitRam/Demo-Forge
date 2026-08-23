@@ -175,3 +175,109 @@ export function scriptFromClicks(
   if (room >= estimateSpeechMs(intro) + MIN_LINE_GAP_MS) lines.unshift({ tStart: 0, text: intro });
   return lines;
 }
+
+// --- steps for a writer ------------------------------------------------------
+
+/**
+ * What a script writer — human or model — is shown: the demo broken into the
+ * moments that need narrating, each with how long there is to say it.
+ *
+ * This is deliberately separate from `scriptFromClicks`. That one *is* the
+ * writer, and a crude one. This one only prepares the brief, so the writing
+ * can be done by something that has actually looked at the screen.
+ */
+export interface ScriptStep {
+  index: number;
+  /** When it happens, source ms. */
+  tMs: number;
+  /** How long until the next step needs describing. */
+  windowMs: number;
+  /** Words that fit in that window at the configured pace. */
+  maxWords: number;
+  /** `open` is the establishing moment at the start; the rest are events. */
+  action: 'open' | 'click' | 'input' | 'scroll' | 'nav';
+  tag?: string;
+  /** The element's own text, when the capture recorded any. */
+  text?: string;
+  xNorm?: number;
+  yNorm?: number;
+}
+
+/** Two clicks closer than this are one step, not two things to say. */
+export const STEP_MERGE_MS = 500;
+/** Nobody can say anything useful in less than this. */
+const MIN_WORDS = 3;
+/** Leave room to breathe rather than filling every window to the brim. */
+const PACE_HEADROOM = 0.85;
+
+export function wordBudget(windowMs: number, wpm: number): number {
+  return Math.max(MIN_WORDS, Math.floor((windowMs / 60_000) * wpm * PACE_HEADROOM));
+}
+
+/**
+ * Break a recording into narratable steps: an opening, then one per click,
+ * with repeated clicks on the same control merged.
+ *
+ * The window on the last step runs to the end of the demo, so a writer knows
+ * it has room for a closing line rather than one more terse instruction.
+ */
+export function scriptSteps(rec: DemoRecording, wpm = DEFAULT_VOICE.rate): ScriptStep[] {
+  const durationMs = rec.video.durationMs;
+  const clicks = rec.events.filter((e) => e.type === 'click').sort((a, b) => a.t - b.t);
+
+  const moments: Array<{ tMs: number; action: ScriptStep['action']; tag?: string; text?: string; xNorm?: number; yNorm?: number }> =
+    [{ tMs: 0, action: 'open' }];
+
+  for (const c of clicks) {
+    const prev = moments.at(-1)!;
+    // Proximity alone, the same rule the zoom planner debounces on: two
+    // clicks a moment apart are one action, and there is no room to say two
+    // things about them anyway. The first of a burst wins, so the narration
+    // still leads the action rather than trailing it.
+    if (c.t - prev.tMs < STEP_MERGE_MS) continue;
+    moments.push({
+      tMs: c.t,
+      action: 'click',
+      ...(c.el?.tag ? { tag: c.el.tag } : {}),
+      ...(c.el?.text ? { text: c.el.text } : {}),
+      xNorm: c.xNorm,
+      yNorm: c.yNorm,
+    });
+  }
+
+  return moments.map((m, i) => {
+    const windowMs = (moments[i + 1]?.tMs ?? durationMs) - m.tMs;
+    return { index: i, ...m, windowMs, maxWords: wordBudget(windowMs, wpm) };
+  });
+}
+
+/** One line of narration a writer produced, tied to the step it describes. */
+export interface WrittenLine {
+  step: number;
+  text: string;
+}
+
+/**
+ * Place written lines on the timeline.
+ *
+ * The words are the writer's; the timing stays ours. A model asked for
+ * timestamps will invent plausible-looking ones, and plausible is not the
+ * same as synchronised — so it only ever says *which step* a line belongs to.
+ */
+export function scriptFromSteps(
+  steps: readonly ScriptStep[],
+  written: readonly WrittenLine[],
+  leadMs = DEFAULT_DRAFT.leadMs,
+): ScriptLine[] {
+  const byIndex = new Map(steps.map((s) => [s.index, s]));
+  const lines: ScriptLine[] = [];
+
+  for (const w of written) {
+    const step = byIndex.get(w.step);
+    const text = w.text.trim();
+    if (!step || text === '') continue;
+    // The opening line has nothing to arrive before, so it starts at zero.
+    lines.push({ tStart: step.action === 'open' ? 0 : Math.max(0, step.tMs - leadMs), text });
+  }
+  return sortScript(lines);
+}

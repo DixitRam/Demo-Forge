@@ -1,0 +1,123 @@
+/**
+ * Asking a model to write the narration.
+ *
+ * The interesting half is here rather than on the server: a model can only
+ * describe what it is shown, so this grabs a frame of the screen at each step
+ * and rings the spot that was clicked. That is the difference between "click
+ * Submit" and a line that names the panel the click opened.
+ *
+ * Frames are drawn from the same decoded video the preview uses, at a size
+ * chosen for a vision model rather than for looking at.
+ */
+
+import type { ScriptStep, WrittenLine } from '@demoforge/core';
+import { seek } from '../export/exportMp4.js';
+
+const ENDPOINT = '/api/script';
+/** Enough for a model to read UI labels; small enough to send two dozen of. */
+const FRAME_W = 720;
+const FRAME_QUALITY = 0.6;
+
+export interface WriterStatus {
+  ok: boolean;
+  model?: string;
+  error?: string;
+}
+
+export async function scriptStatus(): Promise<WriterStatus> {
+  try {
+    const res = await fetch(ENDPOINT);
+    return (await res.json()) as WriterStatus;
+  } catch {
+    return { ok: false, error: 'No script writer on this server.' };
+  }
+}
+
+/**
+ * The opening frame is often the tail of a page load, so it is taken a beat
+ * in. Every other step is grabbed at the moment of the click itself, before
+ * the UI has responded — that is the screen the viewer is being told about.
+ */
+export function frameTimeMs(step: ScriptStep): number {
+  return step.action === 'open' ? Math.min(500, step.windowMs / 2) : step.tMs;
+}
+
+function markClick(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  xNorm: number,
+  yNorm: number,
+): void {
+  const r = Math.max(10, Math.min(w, h) * 0.035);
+  ctx.save();
+  ctx.strokeStyle = '#ff00d0';
+  ctx.lineWidth = Math.max(2, r * 0.18);
+  ctx.beginPath();
+  ctx.arc(xNorm * w, yNorm * h, r, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * A JPEG per step, base64, click ringed. Seeking is serial because a video
+ * element has one playhead.
+ */
+export async function captureFrames(
+  video: HTMLVideoElement,
+  steps: readonly ScriptStep[],
+  onProgress?: (done: number, total: number) => void,
+): Promise<Map<number, string>> {
+  const scale = Math.min(1, FRAME_W / (video.videoWidth || FRAME_W));
+  const w = Math.max(2, Math.round(video.videoWidth * scale));
+  const h = Math.max(2, Math.round(video.videoHeight * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return new Map();
+
+  const wasPaused = video.paused;
+  const resumeAt = video.currentTime;
+  video.pause();
+
+  const frames = new Map<number, string>();
+  try {
+    for (const [i, step] of steps.entries()) {
+      await seek(video, frameTimeMs(step) / 1000);
+      ctx.drawImage(video, 0, 0, w, h);
+      if (step.xNorm !== undefined && step.yNorm !== undefined) {
+        markClick(ctx, w, h, step.xNorm, step.yNorm);
+      }
+      // Strip the `data:image/jpeg;base64,` prefix; the server wants the bytes.
+      frames.set(step.index, canvas.toDataURL('image/jpeg', FRAME_QUALITY).split(',')[1] ?? '');
+      onProgress?.(i + 1, steps.length);
+    }
+  } finally {
+    video.currentTime = resumeAt;
+    if (!wasPaused) void video.play();
+  }
+  return frames;
+}
+
+export async function requestScript(
+  steps: readonly ScriptStep[],
+  frames: ReadonlyMap<number, string>,
+  brief: string,
+): Promise<WrittenLine[]> {
+  const res = await fetch(ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      brief,
+      steps: steps.map((s) => ({ ...s, frame: frames.get(s.index) })),
+    }),
+  });
+  if (!res.ok) {
+    const detail = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(detail?.error ?? `The writer failed (${res.status}).`);
+  }
+  const body = (await res.json()) as { lines?: WrittenLine[] };
+  return body.lines ?? [];
+}

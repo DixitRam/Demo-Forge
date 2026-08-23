@@ -49,12 +49,23 @@ export {
   estimateSpeechMs,
   lineDuration,
   scriptDuration,
+  STEP_MERGE_MS,
   scriptFromClicks,
+  scriptFromSteps,
+  scriptSteps,
   scriptOverruns,
   scriptSlotAt,
   sortScript,
+  wordBudget,
 } from './script.js';
-export type { ScriptDraftConfig, ScriptLine, VoiceProvider, VoiceStyle } from './script.js';
+export type {
+  ScriptDraftConfig,
+  ScriptLine,
+  ScriptStep,
+  VoiceProvider,
+  VoiceStyle,
+  WrittenLine,
+} from './script.js';
 
 export type {
   CaptionCue,

@@ -7,7 +7,10 @@ import {
   scriptFromClicks,
   scriptOverruns,
   scriptSlotAt,
+  scriptFromSteps,
+  scriptSteps,
   sortScript,
+  wordBudget,
   type ScriptLine,
 } from '../src/script.js';
 import { SAMPLE } from './fixtures/sample-recording.js';
@@ -119,5 +122,88 @@ describe('drafting from the click log', () => {
   it('says something even for a log with no clicks', () => {
     const empty = scriptFromClicks({ ...SAMPLE, events: [] });
     expect(empty).toHaveLength(1);
+  });
+});
+
+describe('scriptSteps', () => {
+  const steps = scriptSteps(SAMPLE, 180);
+
+  it('opens with an establishing step before any click', () => {
+    expect(steps[0]).toMatchObject({ index: 0, tMs: 0, action: 'open' });
+    expect(steps[0]!.text).toBeUndefined();
+  });
+
+  it('carries what was clicked, and where', () => {
+    expect(steps[1]).toMatchObject({
+      tMs: 1000,
+      action: 'click',
+      tag: 'button',
+      text: 'button @1000',
+      xNorm: 0.42,
+      yNorm: 0.31,
+    });
+  });
+
+  it('merges a rapid double-click into one step, keeping the first moment', () => {
+    // t=3000 and t=3150 are 150ms apart: one action, one thing to say.
+    expect(steps.filter((s) => s.tMs === 3150)).toHaveLength(0);
+    expect(steps.filter((s) => s.tMs === 3000)).toHaveLength(1);
+  });
+
+  it('has one step per merged click, plus the opening', () => {
+    // SAMPLE has 6 clicks; the pair 150ms apart becomes one.
+    expect(steps.map((s) => s.tMs)).toEqual([0, 1000, 3000, 6000, 9000, 12_000]);
+  });
+
+  it('gives each step the window until the next one needs describing', () => {
+    expect(steps[0]!.windowMs).toBe(1000);
+    expect(steps[1]!.windowMs).toBe(2000);
+    // The last step runs to the end of the demo, not to the next click.
+    expect(steps.at(-1)!.windowMs).toBe(SAMPLE.video.durationMs - steps.at(-1)!.tMs);
+  });
+
+  it('budgets words against the window and never asks for nothing', () => {
+    // 2s at 180wpm with headroom: floor(2/60 * 180 * 0.85) = 5
+    expect(wordBudget(2000, 180)).toBe(5);
+    expect(wordBudget(0, 180)).toBe(3);
+    expect(steps.every((s) => s.maxWords >= 3)).toBe(true);
+  });
+
+  it('paces to the configured speed', () => {
+    expect(wordBudget(10_000, 90)).toBeLessThan(wordBudget(10_000, 180));
+  });
+});
+
+describe('scriptFromSteps', () => {
+  const steps = scriptSteps(SAMPLE);
+
+  it('keeps the timing ours and the words the writers', () => {
+    const lines = scriptFromSteps(
+      steps,
+      [
+        { step: 0, text: 'Here is the dashboard.' },
+        { step: 1, text: 'Open the filters.' },
+      ],
+      700,
+    );
+    expect(lines[0]).toEqual({ tStart: 0, text: 'Here is the dashboard.' });
+    // Step 1 is the click at t=1000, led by 700ms.
+    expect(lines[1]).toEqual({ tStart: 300, text: 'Open the filters.' });
+  });
+
+  it('ignores a step index the writer invented', () => {
+    expect(scriptFromSteps(steps, [{ step: 999, text: 'nope' }])).toEqual([]);
+  });
+
+  it('drops an empty line rather than speaking silence', () => {
+    expect(scriptFromSteps(steps, [{ step: 1, text: '   ' }])).toEqual([]);
+  });
+
+  it('returns lines in time order whatever order they were written in', () => {
+    const lines = scriptFromSteps(steps, [
+      { step: 2, text: 'second' },
+      { step: 0, text: 'first' },
+    ]);
+    expect(lines.map((l) => l.text)).toEqual(['first', 'second']);
   });
 });

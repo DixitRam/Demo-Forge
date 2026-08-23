@@ -15,6 +15,7 @@ import {
 } from '../timeline/scriptOps.js';
 import type { VoiceProgress } from '../voice/useVoice.js';
 import type { ProviderInfo } from '../voice/tts.js';
+import type { WriterStatus } from '../voice/writeScript.js';
 import { Section, Slider } from './controls.js';
 
 /** Starting points for a director's note; it is free text, not a menu. */
@@ -28,6 +29,12 @@ interface Props {
   rec: DemoRecording;
   script: ScriptLine[];
   setScript: (s: ScriptLine[]) => void;
+  brief: string;
+  setBrief: (b: string) => void;
+  writer: WriterStatus | null;
+  writing: string | null;
+  writeError: string | null;
+  onWrite: () => void;
   style: ProjectStyle;
   setStyle: (s: ProjectStyle) => void;
   selected: number | null;
@@ -208,13 +215,43 @@ export default function ScriptPanel(p: Props) {
       </Section>
 
       <Section label="Script">
+        <label className="flex flex-col gap-1">
+          <span className="text-slate-400">What is this demo about?</span>
+          <textarea
+            value={p.brief}
+            rows={2}
+            placeholder="The product, the audience, what you want them to take away. Optional, but it is the difference between a decent script and a good one."
+            onChange={(e) => p.setBrief(e.target.value)}
+            className="w-full resize-none rounded-lg border border-slate-700 bg-slate-900 p-2 text-[11px] leading-relaxed text-slate-100 outline-none focus:border-sky-500"
+          />
+        </label>
+
+        <button
+          onClick={p.onWrite}
+          disabled={p.writing !== null || p.writer?.ok === false}
+          title="Sends a frame of each step, with the click marked, to a model that writes to the time available"
+          className="rounded-lg bg-violet-500/90 py-2 font-medium text-slate-950 hover:bg-violet-400 disabled:opacity-40"
+        >
+          {p.writing ?? '✧ Write the script with AI'}
+        </button>
+        {p.writer?.ok === false && (
+          <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] leading-relaxed text-amber-300">
+            {p.writer.error} It uses the same GEMINI_API_KEY as the voice.
+          </p>
+        )}
+        {p.writeError && (
+          <p className="rounded-lg border border-red-500/30 bg-red-500/10 p-2 text-[11px] text-red-300">
+            {p.writeError}
+          </p>
+        )}
+
         <div className="flex gap-2">
           <button
             onClick={() => {
               p.setScript(scriptFromClicks(p.rec));
               p.onSelect(null);
             }}
-            title="A draft from the element text already in the click log — no AI"
+            title="A rough draft from the element text already in the log — no AI, no network"
             className="flex-1 rounded-lg bg-slate-800 py-2 text-slate-200 hover:bg-slate-700"
           >
             From clicks
@@ -274,8 +311,8 @@ export default function ScriptPanel(p: Props) {
         )}
         {p.script.length === 0 && (
           <p className="text-[11px] leading-relaxed text-slate-500">
-            No narration yet. “From clicks” drafts a line per step from the log; edit the words,
-            then generate the voiceover.
+            No narration yet. Write it with AI — it looks at a frame of every step — or draft
+            something rough “From clicks”. Edit the words, then generate the voiceover.
           </p>
         )}
       </Section>
