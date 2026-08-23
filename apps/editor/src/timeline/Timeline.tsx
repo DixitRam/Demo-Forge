@@ -113,6 +113,7 @@ export default function Timeline({
           ...base.flatMap((k, i) => (i === index ? [] : [k.tStart, k.tEnd])),
         ],
         tolerance: snapWithin(pxPerMs),
+        rec,
       }),
     );
   };

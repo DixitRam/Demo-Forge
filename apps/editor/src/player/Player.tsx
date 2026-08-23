@@ -1,5 +1,5 @@
 import type { ZoomKeyframe } from '@demoforge/core';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { LoadedProject } from '../import/loadRecording.js';
 import { compose } from '../render/compose.js';
 import { outputAspect, type FrameStyle } from '../render/style.js';
@@ -12,10 +12,13 @@ interface Props {
   keyframes: readonly ZoomKeyframe[];
   style: FrameStyle;
   onTime: (ms: number) => void;
+  /** Rendered over the canvas, stretched to the same box. */
+  overlay?: (canvas: { w: number; h: number }) => ReactNode;
 }
 
-export default function Player({ project, keyframes, style, onTime }: Props) {
+export default function Player({ project, keyframes, style, onTime, overlay }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [size, setSize] = useState({ w: PREVIEW_WIDTH, h: 720 });
 
   // The draw loop reads the latest props through a ref so it never restarts.
   const latest = useRef({ keyframes, style, onTime });
@@ -38,6 +41,7 @@ export default function Player({ project, keyframes, style, onTime }: Props) {
       if (canvas.width !== PREVIEW_WIDTH || canvas.height !== h) {
         canvas.width = PREVIEW_WIDTH;
         canvas.height = h;
+        setSize({ w: PREVIEW_WIDTH, h });
       }
       compose(ctx, canvas.width, canvas.height, {
         video,
@@ -54,9 +58,12 @@ export default function Player({ project, keyframes, style, onTime }: Props) {
   }, [project]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="max-h-full max-w-full rounded-lg shadow-2xl shadow-black/50"
-    />
+    <div className="relative max-h-full" style={{ aspectRatio: `${size.w} / ${size.h}` }}>
+      <canvas
+        ref={canvasRef}
+        className="block max-h-full max-w-full rounded-lg shadow-2xl shadow-black/50"
+      />
+      {overlay?.(size)}
+    </div>
   );
 }

@@ -48,6 +48,16 @@ An icon rail on the right opens five panels:
 | Layout | Output aspect — Original, 16:9, 9:16, 1:1, 4:3, 4:5 |
 | Cursor | Show, click pulse, size, smoothing |
 
+**Aiming a zoom.** Select a pill and the preview drops back to the unzoomed
+frame with a rectangle showing exactly what that zoom will crop. Click or drag
+anywhere on the frame to move it, and a floating inspector gives you the zoom
+level, focus mode, reset and delete.
+
+A zoom's focus is **auto** by default: it points at the nearest click, and
+re-aims itself if you drag the pill somewhere else on the timeline. Placing a
+point by hand switches it to **manual**, and nothing moves it again until you
+reset it.
+
 The timeline has a scrubbable ruler with amber marks at every logged click, a
 zoom lane of draggable pills, and a clip lane. **Ctrl+Scroll** zooms the view
 about the pointer, **Shift+Scroll** pans, and the window follows the playhead.

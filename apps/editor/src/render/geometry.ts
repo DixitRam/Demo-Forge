@@ -66,3 +66,27 @@ export function stageGeometry(
     }),
   };
 }
+
+/**
+ * The crop window a zoom will show, in normalised video coordinates. Drawn on
+ * the unzoomed preview so the user can see exactly what will be visible.
+ */
+export function focusRect(
+  scale: number,
+  xNorm: number,
+  yNorm: number,
+): { x: number; y: number; w: number; h: number } {
+  const w = 1 / Math.max(1, scale);
+  return {
+    x: clamp(xNorm - w / 2, 0, 1 - w),
+    y: clamp(yNorm - w / 2, 0, 1 - w),
+    w,
+    h: w,
+  };
+}
+
+/** Range a focus centre may occupy at this scale without leaving the frame. */
+export function focusBounds(scale: number): { min: number; max: number } {
+  const half = 0.5 / Math.max(1, scale);
+  return half >= 0.5 ? { min: 0.5, max: 0.5 } : { min: half, max: 1 - half };
+}

@@ -8,7 +8,13 @@
  * scale instead of bouncing out to 1.0 between them.
  */
 
-import { DEFAULT_ZOOM_CONFIG, clampTarget, type DemoRecording, type ZoomKeyframe } from '@demoforge/core';
+import {
+  DEFAULT_ZOOM_CONFIG,
+  clampTarget,
+  zoomAnchor,
+  type DemoRecording,
+  type ZoomKeyframe,
+} from '@demoforge/core';
 
 /** A pill shorter than this cannot be grabbed, let alone seen. */
 export const MIN_PILL_MS = 200;
@@ -38,6 +44,8 @@ export interface DragContext {
   /** Times worth sticking to: neighbouring edges, clicks, the ends. */
   snapTargets: readonly number[];
   tolerance: number;
+  /** Present when auto-focus zooms should re-aim as they move in time. */
+  rec?: DemoRecording;
 }
 
 /**
@@ -74,8 +82,71 @@ export function applyDrag(
     tEnd = Math.max(Math.min(tEnd, hi), tStart + MIN_PILL_MS);
   }
 
+  const moved: ZoomKeyframe = { ...kf, tStart, tEnd };
+
+  // An auto-focus zoom is "whatever was clicked here", so dragging it along
+  // the timeline re-aims it. A manually placed one stays exactly where the
+  // user put it.
+  if (ctx.rec && moved.focus !== 'manual') {
+    const aim = nearestClickTarget(ctx.rec, zoomAnchor(moved));
+    moved.targetXNorm = clampTarget(aim.xNorm, moved.scale);
+    moved.targetYNorm = clampTarget(aim.yNorm, moved.scale);
+  }
+
   const next = [...base];
-  next[index] = { ...kf, tStart, tEnd };
+  next[index] = moved;
+  return next;
+}
+
+/** Place the focus point by hand; the zoom stops tracking the click log. */
+export function setTarget(
+  kfs: readonly ZoomKeyframe[],
+  index: number,
+  xNorm: number,
+  yNorm: number,
+): ZoomKeyframe[] {
+  const kf = kfs[index];
+  if (!kf) return [...kfs];
+  const next = [...kfs];
+  next[index] = {
+    ...kf,
+    targetXNorm: clampTarget(xNorm, kf.scale),
+    targetYNorm: clampTarget(yNorm, kf.scale),
+    focus: 'manual',
+  };
+  return next;
+}
+
+/** Hand the zoom back to the click log. */
+export function resetFocus(
+  kfs: readonly ZoomKeyframe[],
+  index: number,
+  rec: DemoRecording,
+): ZoomKeyframe[] {
+  const kf = kfs[index];
+  if (!kf) return [...kfs];
+  const aim = nearestClickTarget(rec, zoomAnchor(kf));
+  const next = [...kfs];
+  next[index] = {
+    ...kf,
+    targetXNorm: clampTarget(aim.xNorm, kf.scale),
+    targetYNorm: clampTarget(aim.yNorm, kf.scale),
+    focus: 'auto',
+  };
+  return next;
+}
+
+export function setFocusMode(
+  kfs: readonly ZoomKeyframe[],
+  index: number,
+  mode: 'auto' | 'manual',
+  rec: DemoRecording,
+): ZoomKeyframe[] {
+  if (mode === 'auto') return resetFocus(kfs, index, rec);
+  const kf = kfs[index];
+  if (!kf) return [...kfs];
+  const next = [...kfs];
+  next[index] = { ...kf, focus: 'manual' };
   return next;
 }
 
@@ -90,6 +161,20 @@ export function freeSlotAt(
   const hi = kfs.find((k) => k.tStart > t)?.tStart ?? durationMs;
   if (hi - lo < MIN_PILL_MS) return null;
   return { tStart: lo, tEnd: hi };
+}
+
+/** The click nearest `t`, or the centre when the log has none. */
+export function nearestClickTarget(
+  rec: DemoRecording,
+  t: number,
+): { xNorm: number; yNorm: number } {
+  let best: { d: number; xNorm: number; yNorm: number } = { d: Infinity, xNorm: 0.5, yNorm: 0.5 };
+  for (const e of rec.events) {
+    if (e.type !== 'click') continue;
+    const d = Math.abs(e.t - t);
+    if (d < best.d) best = { d, xNorm: e.xNorm, yNorm: e.yNorm };
+  }
+  return { xNorm: best.xNorm, yNorm: best.yNorm };
 }
 
 /**
@@ -110,23 +195,16 @@ export function insertZoom(
   const tStart = Math.max(slot.tStart, Math.min(t - c.transitionMs, slot.tEnd - want));
   const tEnd = Math.min(slot.tEnd, Math.max(tStart + MIN_PILL_MS, tStart + want));
 
-  const nearest = rec.events
-    .filter((e) => e.type === 'click')
-    .reduce<{ d: number; x: number; y: number }>(
-      (best, e) => {
-        const d = Math.abs(e.t - t);
-        return d < best.d ? { d, x: e.xNorm, y: e.yNorm } : best;
-      },
-      { d: Infinity, x: 0.5, y: 0.5 },
-    );
+  const nearest = nearestClickTarget(rec, t);
 
   const kf: ZoomKeyframe = {
     tStart,
     tEnd,
-    targetXNorm: clampTarget(nearest.x, scale),
-    targetYNorm: clampTarget(nearest.y, scale),
+    targetXNorm: clampTarget(nearest.xNorm, scale),
+    targetYNorm: clampTarget(nearest.yNorm, scale),
     scale,
     easing: 'easeInOutCubic',
+    focus: 'auto',
   };
   return [...kfs, kf].sort((a, b) => a.tStart - b.tStart);
 }

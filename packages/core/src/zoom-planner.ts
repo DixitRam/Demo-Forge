@@ -15,6 +15,20 @@ export interface ZoomKeyframe {
   targetYNorm: number;
   scale: number; // 1.0 = no zoom
   easing: Easing;
+  /**
+   * Where the target came from. 'auto' (the default) means it was derived from
+   * the click log and may be re-derived when the keyframe is moved in time;
+   * 'manual' means a human placed it and nothing should move it again.
+   */
+  focus?: 'auto' | 'manual';
+}
+
+/**
+ * The moment a zoom is fully zoomed in — the click it was planned for. Used
+ * when re-aiming an auto-focus zoom that the user dragged along the timeline.
+ */
+export function zoomAnchor(kf: ZoomKeyframe, transitionMs = DEFAULT_ZOOM_CONFIG.transitionMs): number {
+  return kf.tStart + Math.min(transitionMs, (kf.tEnd - kf.tStart) / 2);
 }
 
 export interface ZoomConfig {

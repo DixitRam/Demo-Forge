@@ -6,7 +6,7 @@ export type {
   DemoViewport,
 } from './types.js';
 
-export { DEFAULT_ZOOM_CONFIG, clampTarget, planZooms } from './zoom-planner.js';
+export { DEFAULT_ZOOM_CONFIG, clampTarget, planZooms, zoomAnchor } from './zoom-planner.js';
 export type { ZoomConfig, ZoomKeyframe } from './zoom-planner.js';
 
 export { IDLE_ZOOM, evaluateZoom } from './zoom-eval.js';

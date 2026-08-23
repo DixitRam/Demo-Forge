@@ -3,9 +3,12 @@ import ExportDialog from './export/ExportDialog.js';
 import { useHotkeys } from './hooks.js';
 import DropZone from './import/DropZone.js';
 import Sidebar from './panels/Sidebar.js';
+import ZoomInspector from './panels/ZoomInspector.js';
+import FocusOverlay from './player/FocusOverlay.js';
 import Player from './player/Player.js';
 import Transport from './player/Transport.js';
 import { useProject } from './state/useProject.js';
+import { setTarget } from './timeline/kfOps.js';
 import Timeline from './timeline/Timeline.js';
 
 const FRAME_MS = 1000 / 30;
@@ -19,6 +22,11 @@ export default function App() {
   const [addSignal, setAddSignal] = useState(0);
 
   const active = useMemo(() => (zoomEnabled ? keyframes : []), [zoomEnabled, keyframes]);
+  // While aiming a zoom the preview shows the unzoomed frame, so the focus
+  // rectangle means "this is what will be visible" rather than sitting on top
+  // of an already-zoomed picture.
+  const aiming = selected !== null && selected < keyframes.length;
+  const preview = aiming ? [] : active;
 
   const video = project?.video;
   const duration = project?.rec.video.durationMs ?? 0;
@@ -75,8 +83,41 @@ export default function App() {
       </header>
 
       <div className="flex min-h-0 flex-1">
-        <main className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[radial-gradient(ellipse_at_top,theme(colors.slate.900),theme(colors.slate.950))] p-6">
-          <Player project={project} keyframes={active} style={style} onTime={setTimeMs} />
+        <main className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[radial-gradient(ellipse_at_top,theme(colors.slate.900),theme(colors.slate.950))] p-6">
+          <Player
+            project={project}
+            keyframes={preview}
+            style={style}
+            onTime={setTimeMs}
+            overlay={
+              aiming
+                ? ({ w, h }) => (
+                    <FocusOverlay
+                      kf={keyframes[selected]!}
+                      canvasW={w}
+                      canvasH={h}
+                      videoW={project.video.videoWidth}
+                      videoH={project.video.videoHeight}
+                      style={style}
+                      onPlace={(x, y) => setKeyframes(setTarget(keyframes, selected, x, y))}
+                    />
+                  )
+                : undefined
+            }
+          />
+          {aiming && (
+            <ZoomInspector
+              rec={project.rec}
+              keyframes={keyframes}
+              setKeyframes={setKeyframes}
+              index={selected}
+              onClose={() => setSelected(null)}
+              onDelete={() => {
+                setKeyframes(keyframes.filter((_, i) => i !== selected));
+                setSelected(null);
+              }}
+            />
+          )}
         </main>
         <Sidebar
           rec={project.rec}
