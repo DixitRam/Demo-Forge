@@ -12,6 +12,11 @@ const TONES = {
     off: 'border-sky-500/50 bg-sky-500/20 text-sky-200 hover:bg-sky-500/30',
     grip: 'bg-sky-300/70',
   },
+  cut: {
+    on: 'border-red-300 bg-red-500/40 text-red-50 ring-1 ring-red-300/60',
+    off: 'border-red-500/50 bg-red-500/20 text-red-200 hover:bg-red-500/30',
+    grip: 'bg-red-300/70',
+  },
   caption: {
     on: 'border-emerald-300 bg-emerald-500/40 text-emerald-50 ring-1 ring-emerald-300/60',
     off: 'border-emerald-500/50 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30',

@@ -16,7 +16,15 @@ import coreURL from '@ffmpeg/core?url';
 import wasmURL from '@ffmpeg/core/wasm?url';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
-import { effectiveTrim, type CaptionCue, type DemoRecording, type Trim, type ZoomKeyframe } from '@demoforge/core';
+import {
+  editedDuration,
+  editedToSource,
+  keptSegments,
+  type CaptionCue,
+  type CutRegion,
+  type DemoRecording,
+  type ZoomKeyframe,
+} from '@demoforge/core';
 import { compose } from '../render/compose.js';
 import { outputAspect, type FrameStyle } from '../render/style.js';
 
@@ -36,7 +44,7 @@ export interface ExportOptions {
   media: Blob;
   keyframes: readonly ZoomKeyframe[];
   captions: readonly CaptionCue[];
-  trim: Trim | null;
+  cuts: readonly CutRegion[];
   style: FrameStyle;
   fps: number;
   onProgress: (stage: string, ratio: number) => void;
@@ -70,13 +78,40 @@ export function outputSize(
 /**
  * Source-video timestamps for every frame of the export, in order.
  *
- * Frames are addressed in SOURCE time, not output time, which is what lets
- * trimming stay free: zooms, captions and the cursor path are all evaluated
- * at these timestamps with no remapping. Only the encode is offset.
+ * We walk EDITED time — the demo as the viewer sees it — and map each frame
+ * back to source time through the edit list. Everything else (zooms,
+ * captions, the cursor path) is then evaluated at a source timestamp with no
+ * remapping of its own, which is what keeps cutting cheap.
  */
-export function frameTimes(startMs: number, endMs: number, fps: number): number[] {
-  const count = Math.max(1, Math.round(((endMs - startMs) / 1000) * fps));
-  return Array.from({ length: count }, (_, i) => startMs + (i / fps) * 1000);
+export function frameTimes(
+  cuts: readonly CutRegion[],
+  durationMs: number,
+  fps: number,
+): number[] {
+  const total = editedDuration(cuts, durationMs);
+  const count = Math.max(1, Math.round((total / 1000) * fps));
+  return Array.from({ length: count }, (_, i) =>
+    editedToSource(cuts, durationMs, (i / fps) * 1000),
+  );
+}
+
+/**
+ * Splice the source audio to match the cuts: trim each kept run out of the
+ * input and concat them. Returns null when there is nothing to splice.
+ *
+ * Doing this as a filter graph rather than decoding and re-splicing in the
+ * browser keeps the whole audio path inside ffmpeg, where it is already going.
+ */
+export function audioFilter(cuts: readonly CutRegion[], durationMs: number): string | null {
+  const segs = keptSegments(cuts, durationMs);
+  if (segs.length === 0) return null;
+  const parts = segs.map(
+    (s, i) =>
+      `[1:a]atrim=${(s.start / 1000).toFixed(3)}:${(s.end / 1000).toFixed(3)},` +
+      `asetpts=N/SR/TB[a${i}]`,
+  );
+  const inputs = segs.map((_, i) => `[a${i}]`).join('');
+  return `${parts.join(';')};${inputs}concat=n=${segs.length}:v=0:a=1[aout]`;
 }
 
 function seek(video: HTMLVideoElement, seconds: number): Promise<void> {
@@ -106,8 +141,7 @@ function toJpeg(canvas: HTMLCanvasElement): Promise<Blob> {
 }
 
 export async function exportMp4(o: ExportOptions): Promise<Blob> {
-  const { rec, video, keyframes, captions, style, fps } = o;
-  const span = effectiveTrim(o.trim, rec.video.durationMs);
+  const { rec, video, keyframes, captions, cuts, style, fps } = o;
   const { w, h } = outputSize(video.videoWidth, video.videoHeight, style);
 
   const canvas = document.createElement('canvas');
@@ -124,7 +158,7 @@ export async function exportMp4(o: ExportOptions): Promise<Blob> {
   const resumeAt = video.currentTime;
   video.pause();
 
-  const times = frameTimes(span.startMs, span.endMs, fps);
+  const times = frameTimes(cuts, rec.video.durationMs, fps);
   const total = times.length;
   try {
     for (let i = 0; i < total; i++) {
@@ -146,21 +180,15 @@ export async function exportMp4(o: ExportOptions): Promise<Blob> {
     // when there is not. Audio stays a separate track muxed at the end, never
     // an input to the zoom logic — which is what lets Phase 2 swap in an AI
     // voiceover without touching any of this.
-    // -ss before -i seeks the audio input to the in-point; the frame sequence
-    // already starts there, so the two line up at output time zero.
-    await ffmpeg.exec([
+    const video_args = [
       '-framerate',
       String(fps),
       '-i',
       'f%06d.jpg',
-      '-ss',
-      (span.startMs / 1000).toFixed(3),
       '-i',
       'source',
-      '-map',
-      '0:v',
-      '-map',
-      '1:a?',
+    ];
+    const encode = [
       '-c:v',
       'libx264',
       '-preset',
@@ -169,14 +197,30 @@ export async function exportMp4(o: ExportOptions): Promise<Blob> {
       '20',
       '-pix_fmt',
       'yuv420p',
+      // Deliberately no -shortest: it would truncate the video to the audio
+      // track, and the video is what the demo actually is.
+      'out.mp4',
+    ];
+
+    const filter = audioFilter(cuts, rec.video.durationMs);
+    const withAudio = [
+      ...video_args,
+      ...(filter ? ['-filter_complex', filter, '-map', '0:v', '-map', '[aout]'] : []),
       '-c:a',
       'aac',
       '-b:a',
       '128k',
-      // Deliberately no -shortest: it would truncate the video to the audio
-      // track, and the video is what the demo actually is.
-      'out.mp4',
-    ]);
+      ...encode,
+    ];
+
+    // A source with no audio track makes the filter graph unresolvable, and
+    // we cannot probe for one from wasm. Try with audio, fall back silently.
+    let code = await ffmpeg.exec(withAudio);
+    if (code !== 0) {
+      o.onProgress('Encoding (no audio)', 0);
+      code = await ffmpeg.exec([...video_args, '-map', '0:v', '-an', ...encode]);
+    }
+    if (code !== 0) throw new Error(`ffmpeg exited with code ${code}.`);
 
     const data = await ffmpeg.readFile('out.mp4');
     o.onProgress('Done', 1);

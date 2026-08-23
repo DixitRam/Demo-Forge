@@ -1,17 +1,27 @@
-import { effectiveTrim, clampTrim, type CaptionCue, type DemoRecording, type Trim, type ZoomKeyframe } from '@demoforge/core';
+import {
+  cutDuration,
+  normalizeCuts,
+  type CaptionCue,
+  type CutRegion,
+  type DemoRecording,
+  type ZoomKeyframe,
+} from '@demoforge/core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { captionSlotAt, insertCaption, moveCaption } from './captionOps.js';
 import { applyDrag, freeSlotAt, insertZoom, snapWithin, type DragMode } from './kfOps.js';
 import Pill from './Pill.js';
 import { fullView, panView, revealTime, zoomView, type View } from './view.js';
 
-export type Selection = { kind: 'zoom' | 'caption'; index: number } | null;
+export type Selection = { kind: 'zoom' | 'caption' | 'cut'; index: number } | null;
 
 const TICK_STEPS_MS = [
   100, 250, 500, 1000, 2000, 5000, 10_000, 15_000, 30_000, 60_000, 120_000, 300_000,
 ];
 const MIN_LABEL_GAP_PX = 68;
 const LANE_LABEL_W = 62;
+/** A fresh cut is this long; drag its edges from there. */
+const DEFAULT_CUT_MS = 2000;
+const MIN_VISIBLE_CUT_MS = 200;
 
 interface Props {
   rec: DemoRecording;
@@ -19,16 +29,17 @@ interface Props {
   setKeyframes: (kfs: ZoomKeyframe[]) => void;
   captions: CaptionCue[];
   setCaptions: (c: CaptionCue[]) => void;
-  trim: Trim | null;
-  setTrim: (t: Trim | null) => void;
+  cuts: CutRegion[];
+  setCuts: (c: CutRegion[]) => void;
   timeMs: number;
   onSeek: (ms: number) => void;
   selection: Selection;
   onSelect: (s: Selection) => void;
   mediaName: string;
-  /** Bumped by the Z / C shortcuts. */
+  /** Bumped by the Z / C / T shortcuts. */
   addZoomSignal: number;
   addCaptionSignal: number;
+  addCutSignal: number;
 }
 
 function label(ms: number, sub: boolean): string {
@@ -44,8 +55,8 @@ export default function Timeline({
   setKeyframes,
   captions,
   setCaptions,
-  trim,
-  setTrim,
+  cuts,
+  setCuts,
   timeMs,
   onSeek,
   selection,
@@ -53,11 +64,11 @@ export default function Timeline({
   mediaName,
   addZoomSignal,
   addCaptionSignal,
+  addCutSignal,
 }: Props) {
-  const keep = effectiveTrim(trim, Math.max(1, rec.video.durationMs));
-  const trimmed = trim !== null;
   const selZoom = selection?.kind === 'zoom' ? selection.index : null;
   const selCaption = selection?.kind === 'caption' ? selection.index : null;
+  const selCut = selection?.kind === 'cut' ? selection.index : null;
   const duration = Math.max(1, rec.video.durationMs);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -137,31 +148,22 @@ export default function Timeline({
     );
   };
 
-  const trimBase = useRef<Trim | null>(null);
+  const cutBase = useRef<CutRegion[] | null>(null);
 
-  const onTrimDrag = (edge: 'start' | 'end') => (e: React.PointerEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    trimBase.current = keep;
-    const el = e.currentTarget as HTMLElement;
-    el.setPointerCapture(e.pointerId);
-    const move = (ev: PointerEvent): void => {
-      const at = toMs(ev.clientX);
-      const from = trimBase.current!;
-      setTrim(
-        clampTrim(
-          edge === 'start' ? { ...from, startMs: at } : { ...from, endMs: at },
-          duration,
-        ),
-      );
-    };
-    const up = (): void => {
-      el.releasePointerCapture(e.pointerId);
-      el.removeEventListener('pointermove', move);
-      el.removeEventListener('pointerup', up);
-    };
-    el.addEventListener('pointermove', move);
-    el.addEventListener('pointerup', up);
+  const onCutDrag = (index: number, mode: DragMode, deltaMs: number): void => {
+    cutBase.current ??= cuts;
+    const base = cutBase.current;
+    const cut = base[index];
+    if (!cut) return;
+    const span = cut.tEnd - cut.tStart;
+    const next = [...base];
+    next[index] =
+      mode === 'move'
+        ? { tStart: cut.tStart + deltaMs, tEnd: cut.tStart + deltaMs + span }
+        : mode === 'start'
+          ? { tStart: cut.tStart + deltaMs, tEnd: cut.tEnd }
+          : { tStart: cut.tStart, tEnd: cut.tEnd + deltaMs };
+    setCuts(normalizeCuts(next, duration));
   };
 
   const onCaptionDrag = (index: number, mode: DragMode, deltaMs: number): void => {
@@ -204,6 +206,23 @@ export default function Timeline({
     addCaptionAt(timeMs);
   }, [addCaptionSignal, addCaptionAt, timeMs]);
 
+  const addCutAt = useCallback(
+    (t: number): void => {
+      const next = normalizeCuts([...cuts, { tStart: t, tEnd: t + DEFAULT_CUT_MS }], duration);
+      setCuts(next);
+      onSelect({ kind: 'cut', index: next.findIndex((c) => t >= c.tStart && t < c.tEnd) });
+    },
+    [cuts, duration, setCuts, onSelect],
+  );
+
+  const lastCut = useRef(addCutSignal);
+  useEffect(() => {
+    if (addCutSignal === lastCut.current) return;
+    lastCut.current = addCutSignal;
+    addCutAt(timeMs);
+  }, [addCutSignal, addCutAt, timeMs]);
+
+  const canAddCut = timeMs < duration - MIN_VISIBLE_CUT_MS;
   const canAddZoom = freeSlotAt(keyframes, timeMs, duration) !== null;
   const canAddCaption = captionSlotAt(captions, timeMs, duration) !== null;
   const playheadX = toPx(Math.min(timeMs, duration));
@@ -230,8 +249,10 @@ export default function Timeline({
             if (!selection) return;
             if (selection.kind === 'zoom') {
               setKeyframes(keyframes.filter((_, i) => i !== selection.index));
-            } else {
+            } else if (selection.kind === 'caption') {
               setCaptions(captions.filter((_, i) => i !== selection.index));
+            } else {
+              setCuts(cuts.filter((_, i) => i !== selection.index));
             }
             onSelect(null);
           }}
@@ -241,25 +262,11 @@ export default function Timeline({
           Delete
         </button>
         <button
-          onClick={() => setTrim(clampTrim({ ...keep, startMs: timeMs }, duration))}
-          title="Trim the start to the playhead"
-          className="rounded bg-slate-800 px-2 py-0.5 text-slate-200 hover:bg-slate-700"
-        >
-          Set in <kbd className="text-slate-500">I</kbd>
-        </button>
-        <button
-          onClick={() => setTrim(clampTrim({ ...keep, endMs: timeMs }, duration))}
-          title="Trim the end to the playhead"
-          className="rounded bg-slate-800 px-2 py-0.5 text-slate-200 hover:bg-slate-700"
-        >
-          Set out <kbd className="text-slate-500">O</kbd>
-        </button>
-        <button
-          onClick={() => setTrim(null)}
-          disabled={!trimmed}
+          onClick={() => addCutAt(timeMs)}
+          disabled={!canAddCut}
           className="rounded bg-slate-800 px-2 py-0.5 text-slate-200 hover:bg-slate-700 disabled:opacity-40"
         >
-          Reset trim
+          + Cut <kbd className="text-slate-500">T</kbd>
         </button>
         <button
           onClick={() => setView(fullView(duration))}
@@ -267,6 +274,11 @@ export default function Timeline({
         >
           Fit
         </button>
+        {cuts.length > 0 && (
+          <span className="text-red-300/80">
+            {(cutDuration(cuts) / 1000).toFixed(1)}s cut
+          </span>
+        )}
         <span className="ml-auto flex gap-3">
           <span className="rounded bg-slate-900 px-1.5 py-0.5">Shift+Scroll pan</span>
           <span className="rounded bg-slate-900 px-1.5 py-0.5">Ctrl+Scroll zoom</span>
@@ -275,6 +287,7 @@ export default function Timeline({
 
       <div className="flex">
         <div className="shrink-0 pt-6 pl-4 text-[10px] text-slate-600" style={{ width: LANE_LABEL_W }}>
+          <div className="flex h-8 items-center">cut</div>
           <div className="flex h-9 items-center">zoom</div>
           <div className="flex h-8 items-center">caption</div>
           <div className="flex h-7 items-center">clip</div>
@@ -309,6 +322,40 @@ export default function Timeline({
                 className="absolute bottom-0 h-2 w-px bg-amber-400/80"
               />
             ))}
+          </div>
+
+          <div
+            onPointerDown={() => onSelect(null)}
+            onDoubleClick={(e) => addCutAt(toMs(e.clientX))}
+            className="relative h-8 border-b border-slate-800/60 bg-slate-900/40"
+          >
+            {cuts.map((cut, i) => {
+              const l = toPx(cut.tStart);
+              const w = (cut.tEnd - cut.tStart) * pxPerMs;
+              if (l + w < -20 || l > width + 20) return null;
+              return (
+                <Pill
+                  key={i}
+                  tone="cut"
+                  leftPx={l}
+                  widthPx={w}
+                  pxPerMs={pxPerMs}
+                  selected={selCut === i}
+                  title={`Skips ${((cut.tEnd - cut.tStart) / 1000).toFixed(1)}s of source`}
+                  label={`${((cut.tEnd - cut.tStart) / 1000).toFixed(1)}s`}
+                  onSelect={() => onSelect({ kind: 'cut', index: i })}
+                  onDrag={(mode, delta) => onCutDrag(i, mode, delta)}
+                  onDragEnd={() => {
+                    cutBase.current = null;
+                  }}
+                />
+              );
+            })}
+            {cuts.length === 0 && (
+              <span className="pointer-events-none absolute inset-0 grid place-items-center text-[11px] text-slate-600">
+                Press T to cut a section out
+              </span>
+            )}
           </div>
 
           <div
@@ -391,27 +438,14 @@ export default function Timeline({
 
           {/* What the export will drop, shaded across every lane. */}
           <div className="pointer-events-none absolute top-6 right-4 bottom-0 left-0">
-            <div
-              style={{ left: 0, width: Math.max(0, toPx(keep.startMs)) }}
-              className="absolute inset-y-0 bg-slate-950/70"
-            />
-            <div
-              style={{ left: toPx(keep.endMs), right: 0 }}
-              className="absolute inset-y-0 bg-slate-950/70"
-            />
+            {cuts.map((cut, i) => (
+              <div
+                key={i}
+                style={{ left: toPx(cut.tStart), width: (cut.tEnd - cut.tStart) * pxPerMs }}
+                className="absolute inset-y-0 border-x border-red-400/40 bg-slate-950/65"
+              />
+            ))}
           </div>
-          {(['start', 'end'] as const).map((edge) => (
-            <div
-              key={edge}
-              onPointerDown={onTrimDrag(edge)}
-              style={{ left: toPx(edge === 'start' ? keep.startMs : keep.endMs) }}
-              title={edge === 'start' ? 'Drag the in point' : 'Drag the out point'}
-              className="absolute top-6 bottom-0 z-10 -ml-1 w-2 cursor-ew-resize"
-            >
-              <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-amber-400" />
-              <span className="absolute top-0 left-1/2 h-3 w-2 -translate-x-1/2 rounded-b-sm bg-amber-400" />
-            </div>
-          ))}
 
           {/* Playhead spans every lane. */}
           <div

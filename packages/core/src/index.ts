@@ -23,15 +23,25 @@ export type { Easing } from './easing.js';
 
 export {
   DEFAULT_STYLE,
-  MIN_TRIM_MS,
   PROJECT_FORMAT,
   PROJECT_VERSION,
-  clampTrim,
   createProject,
-  effectiveTrim,
   isProject,
   parseProject,
 } from './project.js';
+
+export {
+  MIN_CUT_MS,
+  cutAt,
+  cutDuration,
+  editedDuration,
+  editedToSource,
+  keptSegments,
+  normalizeCuts,
+  skipTarget,
+  sourceToEdited,
+} from './edits.js';
+export type { CutRegion, Segment } from './edits.js';
 export type {
   CaptionCue,
   CaptionStyle,
@@ -39,5 +49,4 @@ export type {
   DemoProject,
   ProjectBackground,
   ProjectStyle,
-  Trim,
 } from './project.js';

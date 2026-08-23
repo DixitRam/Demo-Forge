@@ -1,4 +1,4 @@
-import { effectiveTrim, type CaptionCue, type Trim, type ZoomKeyframe } from '@demoforge/core';
+import { editedDuration, type CaptionCue, type CutRegion, type ZoomKeyframe } from '@demoforge/core';
 import { useRef, useState } from 'react';
 import type { LoadedProject } from '../import/loadRecording.js';
 import type { FrameStyle } from '../render/style.js';
@@ -10,11 +10,11 @@ interface Props {
   project: LoadedProject;
   keyframes: readonly ZoomKeyframe[];
   captions: readonly CaptionCue[];
-  trim: Trim | null;
+  cuts: readonly CutRegion[];
   style: FrameStyle;
 }
 
-export default function ExportDialog({ project, keyframes, captions, trim, style }: Props) {
+export default function ExportDialog({ project, keyframes, captions, cuts, style }: Props) {
   const [open, setOpen] = useState(false);
   const [fps, setFps] = useState(30);
   const [stage, setStage] = useState<string | null>(null);
@@ -34,7 +34,7 @@ export default function ExportDialog({ project, keyframes, captions, trim, style
         media: project.media,
         keyframes,
         captions,
-        trim,
+        cuts,
         style,
         fps,
         signal: abort.current.signal,
@@ -67,13 +67,8 @@ export default function ExportDialog({ project, keyframes, captions, trim, style
 
   return (
     <div className="ml-auto flex items-center gap-3 text-xs">
-      <span className="text-slate-500">
-        {(
-          (effectiveTrim(trim, project.rec.video.durationMs).endMs -
-            effectiveTrim(trim, project.rec.video.durationMs).startMs) /
-          1000
-        ).toFixed(1)}
-        s
+      <span className="text-slate-500" title="Length after cuts">
+        {(editedDuration(cuts, project.rec.video.durationMs) / 1000).toFixed(1)}s
       </span>
       <label className="flex items-center gap-1 text-slate-400">
         fps

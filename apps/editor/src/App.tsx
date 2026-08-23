@@ -1,9 +1,10 @@
-import { clampTrim, effectiveTrim } from '@demoforge/core';
+import { cutDuration, normalizeCuts } from '@demoforge/core';
 import { useMemo, useState } from 'react';
 import ExportDialog from './export/ExportDialog.js';
 import { useHotkeys } from './hooks.js';
 import DropZone from './import/DropZone.js';
 import Sidebar from './panels/Sidebar.js';
+import CutInspector from './panels/CutInspector.js';
 import ZoomInspector from './panels/ZoomInspector.js';
 import FocusOverlay from './player/FocusOverlay.js';
 import Player from './player/Player.js';
@@ -21,8 +22,8 @@ export default function App() {
     setKeyframes,
     captions,
     setCaptions,
-    trim,
-    setTrim,
+    cuts,
+    setCuts,
     style,
     setStyle,
     load,
@@ -35,6 +36,7 @@ export default function App() {
   // Bumped by the Z / C shortcuts; the timeline decides where the new item goes.
   const [addZoom, setAddZoom] = useState(0);
   const [addCaption, setAddCaption] = useState(0);
+  const [addCut, setAddCut] = useState(0);
 
   const active = useMemo(() => (zoomEnabled ? keyframes : []), [zoomEnabled, keyframes]);
 
@@ -46,8 +48,11 @@ export default function App() {
 
   const deleteSelected = (): void => {
     if (!selection) return;
-    if (selection.kind === 'zoom') setKeyframes(keyframes.filter((_, i) => i !== selection.index));
-    else setCaptions(captions.filter((_, i) => i !== selection.index));
+    if (selection.kind === 'zoom')
+      setKeyframes(keyframes.filter((_, i) => i !== selection.index));
+    else if (selection.kind === 'caption')
+      setCaptions(captions.filter((_, i) => i !== selection.index));
+    else setCuts(cuts.filter((_, i) => i !== selection.index));
     setSelection(null);
   };
 
@@ -59,8 +64,10 @@ export default function App() {
           video.paused ? void video.play() : video.pause();
         },
         z: () => setAddZoom((n) => n + 1),
-        i: () => setTrim(clampTrim({ ...effectiveTrim(trim, duration), startMs: timeMs }, duration)),
-        o: () => setTrim(clampTrim({ ...effectiveTrim(trim, duration), endMs: timeMs }, duration)),
+        t: () => setAddCut((n) => n + 1),
+        // Cut everything before / after the playhead — the head-and-tail trim.
+        i: () => setCuts(normalizeCuts([...cuts, { tStart: 0, tEnd: timeMs }], duration)),
+        o: () => setCuts(normalizeCuts([...cuts, { tStart: timeMs, tEnd: duration }], duration)),
         c: () => setAddCaption((n) => n + 1),
         s: () => save(),
         ArrowLeft: () => seek(timeMs - FRAME_MS),
@@ -74,7 +81,7 @@ export default function App() {
         Backspace: deleteSelected,
       }),
       // eslint-disable-next-line react-hooks/exhaustive-deps
-      [video, timeMs, duration, selection, keyframes, captions, trim, save],
+      [video, timeMs, duration, selection, keyframes, captions, cuts, save],
     ),
   );
 
@@ -95,6 +102,12 @@ export default function App() {
         <span className="text-xs text-slate-500">
           {project.rec.events.length} events · {keyframes.length} zooms · {captions.length}{' '}
           captions
+          {cuts.length > 0 && (
+            <>
+              {' '}
+              · <span className="text-red-300/80">{(cutDuration(cuts) / 1000).toFixed(1)}s cut</span>
+            </>
+          )}
         </span>
         {project.warning && (
           <span className="truncate text-xs text-amber-400">{project.warning}</span>
@@ -110,7 +123,7 @@ export default function App() {
           project={project}
           keyframes={active}
           captions={captions}
-          trim={trim}
+          cuts={cuts}
           style={style}
         />
       </header>
@@ -121,7 +134,7 @@ export default function App() {
             project={project}
             keyframes={preview}
             captions={captions}
-            trim={trim}
+            cuts={cuts}
             style={style}
             onTime={setTimeMs}
             overlay={
@@ -140,6 +153,14 @@ export default function App() {
                   )
             }
           />
+          {selection?.kind === 'cut' && selection.index < cuts.length && (
+            <CutInspector
+              cuts={cuts}
+              index={selection.index}
+              onClose={() => setSelection(null)}
+              onDelete={deleteSelected}
+            />
+          )}
           {aimIndex !== null && (
             <ZoomInspector
               rec={project.rec}
@@ -186,8 +207,8 @@ export default function App() {
           setKeyframes={setKeyframes}
           captions={captions}
           setCaptions={setCaptions}
-          trim={trim}
-          setTrim={setTrim}
+          cuts={cuts}
+          setCuts={setCuts}
           timeMs={timeMs}
           onSeek={seek}
           selection={selection}
@@ -195,6 +216,7 @@ export default function App() {
           mediaName={project.mediaName}
           addZoomSignal={addZoom}
           addCaptionSignal={addCaption}
+          addCutSignal={addCut}
         />
       </footer>
     </div>

@@ -1,4 +1,4 @@
-import { effectiveTrim, type CaptionCue, type Trim, type ZoomKeyframe } from '@demoforge/core';
+import { skipTarget, type CaptionCue, type CutRegion, type ZoomKeyframe } from '@demoforge/core';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { LoadedProject } from '../import/loadRecording.js';
 import { compose } from '../render/compose.js';
@@ -11,20 +11,20 @@ interface Props {
   project: LoadedProject;
   keyframes: readonly ZoomKeyframe[];
   captions: readonly CaptionCue[];
-  trim: Trim | null;
+  cuts: readonly CutRegion[];
   style: FrameStyle;
   onTime: (ms: number) => void;
   /** Rendered over the canvas, stretched to the same box. */
   overlay?: (canvas: { w: number; h: number }) => ReactNode;
 }
 
-export default function Player({ project, keyframes, captions, trim, style, onTime, overlay }: Props) {
+export default function Player({ project, keyframes, captions, cuts, style, onTime, overlay }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: PREVIEW_WIDTH, h: 720 });
 
   // The draw loop reads the latest props through a ref so it never restarts.
-  const latest = useRef({ keyframes, captions, trim, style, onTime });
-  latest.current = { keyframes, captions, trim, style, onTime };
+  const latest = useRef({ keyframes, captions, cuts, style, onTime });
+  latest.current = { keyframes, captions, cuts, style, onTime };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -37,15 +37,14 @@ export default function Player({ project, keyframes, captions, trim, style, onTi
     const draw = (): void => {
       const cur = latest.current;
 
-      // Playback stays inside the kept span. Doing it here rather than on
-      // 'timeupdate' means the clamp lands within a frame instead of the
-      // ~250ms that event fires at.
-      const span = effectiveTrim(cur.trim, rec.video.durationMs);
-      if (video.currentTime * 1000 < span.startMs - 1) {
-        video.currentTime = span.startMs / 1000;
-      } else if (video.currentTime * 1000 >= span.endMs) {
-        if (!video.paused) video.pause();
-        video.currentTime = span.endMs / 1000;
+      // Playback jumps over cut regions. Done here rather than on 'timeupdate'
+      // so the skip lands within a frame instead of the ~250ms that event
+      // fires at — otherwise you see a quarter second of removed footage.
+      const jump = skipTarget(cur.cuts, rec.video.durationMs, video.currentTime * 1000);
+      if (jump !== null) {
+        video.currentTime = jump / 1000;
+        // A cut running to the end has nowhere to land: stop there.
+        if (jump >= rec.video.durationMs && !video.paused) video.pause();
       }
 
       const t = video.currentTime * 1000;
