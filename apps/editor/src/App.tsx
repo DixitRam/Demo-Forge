@@ -1,5 +1,5 @@
 import { cutDuration, normalizeCuts } from '@demoforge/core';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import ExportDialog from './export/ExportDialog.js';
 import { useHotkeys } from './hooks.js';
 import DropZone from './import/DropZone.js';
@@ -48,6 +48,16 @@ export default function App() {
   const video = project?.video;
   const duration = project?.rec.video.durationMs ?? 0;
   const voice = useVoice(duration);
+
+  // A narration saved with the project plays straight away, and its lines go
+  // back into the speech cache so editing one does not respeak them all.
+  const { adopt } = voice;
+  useEffect(() => {
+    if (project?.narration) {
+      void adopt(project.narration, project.script, project.style.voice);
+    }
+  }, [project, adopt]);
+
   const seek = (ms: number): void => {
     if (video) video.currentTime = Math.min(Math.max(0, ms), duration) / 1000;
   };
@@ -78,7 +88,7 @@ export default function App() {
         o: () => setCuts(normalizeCuts([...cuts, { tStart: timeMs, tEnd: duration }], duration)),
         c: () => setAddCaption((n) => n + 1),
         n: () => setAddLine((n) => n + 1),
-        s: () => save(),
+        s: () => save(voice.narration),
         ArrowLeft: () => seek(timeMs - FRAME_MS),
         ArrowRight: () => seek(timeMs + FRAME_MS),
         'shift+ArrowLeft': () => seek(timeMs - 1000),
@@ -90,7 +100,7 @@ export default function App() {
         Backspace: deleteSelected,
       }),
       // eslint-disable-next-line react-hooks/exhaustive-deps
-      [video, timeMs, duration, selection, keyframes, captions, cuts, script, save],
+      [video, timeMs, duration, selection, keyframes, captions, cuts, script, save, voice.narration],
     ),
   );
 
@@ -122,8 +132,8 @@ export default function App() {
           <span className="truncate text-xs text-amber-400">{project.warning}</span>
         )}
         <button
-          onClick={save}
-          title="Save project (S) — JSON you can edit by hand or with a script"
+          onClick={() => save(voice.narration)}
+          title="Save project (S) — JSON you can edit by hand or with a script, plus the narration"
           className="ml-auto rounded bg-slate-800 px-3 py-1 text-xs text-slate-200 hover:bg-slate-700"
         >
           Save project

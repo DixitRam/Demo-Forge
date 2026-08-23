@@ -98,6 +98,11 @@ export function lineKey(text: string, voice: VoiceStyle): string {
  * video element — so the preview can slave it to `video.currentTime` and the
  * exporter can splice it with exactly the cut filter it already applies to the
  * captured audio. Nothing here knows what a cut is.
+ *
+ * It is mixed at UNITY. Level is applied once, at playback and at export, so
+ * the two agree and so the slider does not force a re-mix — and so a saved
+ * mixdown can be sliced back into per-line audio later without a baked-in
+ * gain to undo.
  */
 export async function mixNarration(
   lines: readonly ScriptLine[],
@@ -116,17 +121,35 @@ export async function mixNarration(
   const frames = Math.max(1, Math.ceil((endMs / 1000) * rate));
 
   const ctx = new OfflineAudioContext(1, frames, rate);
-  const gain = ctx.createGain();
-  gain.gain.value = voice.gain;
-  gain.connect(ctx.destination);
   for (const p of parts) {
     const src = ctx.createBufferSource();
     src.buffer = p.buf;
-    src.connect(gain);
+    src.connect(ctx.destination);
     src.start(Math.max(0, p.at / 1000));
   }
 
   const mixed = await ctx.startRendering();
   const wav = encodeWav([mixed.getChannelData(0)], mixed.sampleRate);
   return new Blob([wav as Uint8Array<ArrayBuffer>], { type: 'audio/wav' });
+}
+
+/**
+ * Where one line sits inside a saved mixdown, in frames.
+ *
+ * Null when the line is not in there at all — never spoken, zero length, or
+ * anchored past the end of the track. A short track is truncated rather than
+ * refused: a mixdown ends when the last line stops talking, so the final
+ * line is routinely a few frames shorter than its measurement.
+ */
+export function sliceRange(
+  tStartMs: number,
+  audioMs: number | undefined,
+  sampleRate: number,
+  totalFrames: number,
+): { start: number; length: number } | null {
+  if (audioMs === undefined || audioMs <= 0) return null;
+  const start = Math.round((tStartMs / 1000) * sampleRate);
+  if (start < 0 || start >= totalFrames) return null;
+  const length = Math.min(Math.round((audioMs / 1000) * sampleRate), totalFrames - start);
+  return length > 0 ? { start, length } : null;
 }

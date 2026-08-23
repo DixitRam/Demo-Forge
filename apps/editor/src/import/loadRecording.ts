@@ -19,6 +19,8 @@ export interface LoadedProject {
   /** The original file, kept so the exporter can mux its audio track back in. */
   media: Blob;
   mediaName: string;
+  /** A narration mixdown saved alongside the project, if one was dropped in. */
+  narration: Blob | null;
   /** Edits restored from a project file, or planned fresh from the log. */
   zooms: ZoomKeyframe[];
   captions: CaptionCue[];
@@ -83,6 +85,7 @@ export async function loadBundle(files: File[]): Promise<LoadedProject> {
   if (!json || !media) {
     throw new Error('Drop a video plus either demo.json or a .dfp.json project.');
   }
+  const narrationFile = files.find((f) => /\.wav$/i.test(f.name));
 
   const parsed: unknown = JSON.parse(await json.text());
   const project = isProject(parsed) ? parseProject(parsed) : null;
@@ -100,6 +103,9 @@ export async function loadBundle(files: File[]): Promise<LoadedProject> {
     videoUrl,
     media,
     mediaName: media.name,
+    // Named in the project or not, a dropped .wav is the narration — the name
+    // is a hint, not a gate, because files get renamed.
+    narration: narrationFile ?? null,
     zooms: project ? project.zooms : planZooms(rec),
     captions: project ? project.captions : [],
     cuts: project ? project.cuts : [],

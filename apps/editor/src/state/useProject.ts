@@ -34,27 +34,47 @@ export function useProject() {
   }, [project]);
 
   /**
-   * Save everything but the video as one readable JSON file. It is the same
-   * schema a script or an agent can edit and hand back.
+   * Save everything but the video as one readable JSON file — zooms, captions,
+   * cuts, the narration script and the style. It is the same schema a script
+   * or an agent can edit and hand back.
+   *
+   * The rendered narration comes out beside it as a second file rather than
+   * base64 inside the first: the project stays readable, and a hosted voice
+   * is metered, so the audio is worth keeping rather than paying to speak
+   * again on every load.
    */
-  const save = useCallback(() => {
-    if (!project) return;
-    const doc = createProject(project.rec, project.mediaName, {
-      zooms: keyframes,
-      captions,
-      cuts,
-      script,
-      style,
-    });
-    const url = URL.createObjectURL(
-      new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' }),
-    );
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${project.mediaName.replace(/\.[^.]+$/, '') || 'demo'}.dfp.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [project, keyframes, captions, cuts, script, style]);
+  const save = useCallback(
+    (narration: Blob | null) => {
+      if (!project) return;
+      const stem = project.mediaName.replace(/\.[^.]+$/, '') || 'demo';
+      const narrationName = narration ? `${stem}.narration.wav` : '';
+
+      const doc = createProject(project.rec, project.mediaName, {
+        zooms: keyframes,
+        captions,
+        cuts,
+        script,
+        narrationName,
+        style,
+      });
+
+      const download = (blob: Blob, name: string): void => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = name;
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+
+      download(
+        new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' }),
+        `${stem}.dfp.json`,
+      );
+      if (narration) download(narration, narrationName);
+    },
+    [project, keyframes, captions, cuts, script, style],
+  );
 
   return {
     project,

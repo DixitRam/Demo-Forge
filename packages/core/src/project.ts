@@ -74,6 +74,13 @@ export interface DemoProject {
   createdAt: string;
   /** Filename of the video this project describes; not a path. */
   mediaName: string;
+  /**
+   * Filename of the rendered narration, if one was saved beside the project.
+   * Empty when there is none. Kept as a separate file rather than base64 in
+   * here: a project stays readable, and a hosted voice is metered, so the
+   * audio is worth keeping rather than paying to speak again on every load.
+   */
+  narrationName: string;
   recording: DemoRecording;
   /** Time-ordered, non-overlapping. */
   zooms: ZoomKeyframe[];
@@ -105,6 +112,7 @@ export interface ProjectParts {
   captions?: CaptionCue[];
   cuts?: CutRegion[];
   script?: ScriptLine[];
+  narrationName?: string;
   style?: ProjectStyle;
 }
 
@@ -118,6 +126,7 @@ export function createProject(
     version: PROJECT_VERSION,
     createdAt: recording.createdAt,
     mediaName,
+    narrationName: parts.narrationName ?? '',
     recording,
     zooms: parts.zooms ?? [],
     captions: parts.captions ?? [],
@@ -327,6 +336,7 @@ export function parseProject(value: unknown): DemoProject {
     version: PROJECT_VERSION,
     createdAt: str(p.createdAt, rec.createdAt),
     mediaName: str(p.mediaName, ''),
+    narrationName: str(p.narrationName, ''),
     recording: rec,
     zooms: parseZooms(p.zooms, durationMs),
     captions: parseCaptions(p.captions, durationMs),

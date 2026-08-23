@@ -18,7 +18,8 @@ const project = createProject(SAMPLE, 'recording.webm', {
     { tStart: 0, tEnd: 1000 },
     { tStart: 12_000, tEnd: DUR },
   ],
-  script: [{ tStart: 500, text: 'Open the dashboard from the sidebar.' }],
+  script: [{ tStart: 500, text: 'Open the dashboard from the sidebar.', audioMs: 2100 }],
+  narrationName: 'recording.narration.wav',
 });
 
 describe('project round-trip', () => {
@@ -27,6 +28,7 @@ describe('project round-trip', () => {
     expect(back.zooms).toEqual(project.zooms);
     expect(back.captions).toEqual(project.captions);
     expect(back.script).toEqual(project.script);
+    expect(back.narrationName).toBe('recording.narration.wav');
     expect(back.style).toEqual(project.style);
     expect(back.recording.events).toEqual(SAMPLE.events);
     expect(back.mediaName).toBe('recording.webm');
@@ -123,7 +125,24 @@ describe('parseProject repairs a hand-edited file', () => {
     });
     expect(p.zooms).toEqual([]);
     expect(p.captions).toEqual([]);
+    expect(p.script).toEqual([]);
+    expect(p.narrationName).toBe('');
     expect(p.style).toEqual(DEFAULT_STYLE);
+  });
+
+  it('drops a stale measurement rather than laying out audio that is gone', () => {
+    const p = parseProject({
+      ...JSON.parse(JSON.stringify(project)),
+      script: [
+        { tStart: 0, text: 'kept', audioMs: 1200 },
+        { tStart: 3000, text: 'never spoken', audioMs: 0 },
+        { tStart: 5000, text: 'nonsense', audioMs: 'soon' },
+        { tStart: 7000, text: '   ' },
+      ],
+    });
+    expect(p.script.map((l) => l.audioMs)).toEqual([1200, undefined, undefined]);
+    // A line with no words is not a line.
+    expect(p.script).toHaveLength(3);
   });
 });
 

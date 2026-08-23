@@ -10,6 +10,7 @@ import {
   RateLimited,
   lineKey,
   mixNarration,
+  sliceRange,
   speak,
   ttsProviders,
   type ProviderInfo,
@@ -110,10 +111,46 @@ export function useVoice(durationMs: number) {
     [durationMs],
   );
 
+  /**
+   * Take on a mixdown saved with a project, and recover the individual lines
+   * out of it.
+   *
+   * Each line knows where it starts and how long it ran, so the track can be
+   * sliced back into per-line audio and put in the cache. That is what makes
+   * editing one line of a reloaded project cost one request instead of
+   * respeaking the whole script — which matters when the voice is metered.
+   *
+   * Lines that overlap will slice with a little of their neighbour in them;
+   * the panel already flags overlaps as something to fix.
+   */
+  const adopt = useCallback(
+    async (blob: Blob, lines: readonly ScriptLine[], voice: VoiceStyle): Promise<void> => {
+      setNarration(blob);
+      ctx.current ??= new AudioContext();
+      const audio = ctx.current;
+      try {
+        const whole = await audio.decodeAudioData(await blob.arrayBuffer());
+        const rate = whole.sampleRate;
+        const channel = whole.getChannelData(0);
+        for (const line of lines) {
+          const at = sliceRange(line.tStart, line.audioMs, rate, whole.length);
+          if (!at) continue;
+          const slice = audio.createBuffer(1, at.length, rate);
+          slice.copyToChannel(channel.subarray(at.start, at.start + at.length), 0);
+          spoken.current.set(lineKey(line.text, voice), slice);
+        }
+      } catch {
+        // The mixdown still plays and still exports; only the per-line reuse
+        // is lost, and that costs a regenerate, not correctness.
+      }
+    },
+    [],
+  );
+
   const clear = useCallback(() => {
     setNarration(null);
     setError(null);
   }, []);
 
-  return { providers, progress, error, narration, narrationUrl, generate, clear };
+  return { providers, progress, error, narration, narrationUrl, generate, adopt, clear };
 }

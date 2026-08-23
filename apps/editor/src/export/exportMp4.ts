@@ -141,12 +141,14 @@ export function audioFilter(
 export function mixFilter(
   cuts: readonly CutRegion[],
   durationMs: number,
-  opts: { tabAudio: boolean; narration: boolean; duck: number },
+  opts: { tabAudio: boolean; narration: boolean; duck: number; gain: number },
 ): string | null {
   const src = opts.tabAudio
     ? audioFilter(cuts, durationMs, 1, 'aorig', opts.narration ? opts.duck : undefined)
     : null;
-  const nar = opts.narration ? audioFilter(cuts, durationMs, 2, 'anarr') : null;
+  // The mixdown is at unity, so the voice level is applied here — the same
+  // number the preview hands to the audio element.
+  const nar = opts.narration ? audioFilter(cuts, durationMs, 2, 'anarr', opts.gain) : null;
 
   if (src && nar) {
     return (
@@ -262,15 +264,23 @@ export async function exportMp4(o: ExportOptions): Promise<Blob> {
     // that references one it does not have is unresolvable. So: ask for
     // everything, and on failure drop the part we are unsure of. The
     // narration is our own file, so it is the one input we know exists.
-    const duck = o.voice.duck;
+    const { duck, gain } = o.voice;
     const attempts = [
       mixFilter(cuts, rec.video.durationMs, {
         tabAudio: true,
         narration: !!o.narration,
         duck,
+        gain,
       }),
       ...(o.narration
-        ? [mixFilter(cuts, rec.video.durationMs, { tabAudio: false, narration: true, duck })]
+        ? [
+            mixFilter(cuts, rec.video.durationMs, {
+              tabAudio: false,
+              narration: true,
+              duck,
+              gain,
+            }),
+          ]
         : []),
     ];
 

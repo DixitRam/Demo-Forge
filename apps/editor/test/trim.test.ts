@@ -103,7 +103,7 @@ describe('audioFilter', () => {
 });
 
 describe('mixFilter', () => {
-  const opts = { tabAudio: true, narration: true, duck: 0.25 };
+  const opts = { tabAudio: true, narration: true, duck: 0.25, gain: 1 };
 
   it('is nothing at all when there is neither track', () => {
     expect(mixFilter(CUTS, DUR, { ...opts, tabAudio: false, narration: false })).toBeNull();
@@ -121,7 +121,17 @@ describe('mixFilter', () => {
     // Narration is input 2 and gets the identical trim points.
     expect(f).toContain('[2:a]atrim=0.000:3.000');
     expect(f).toContain('[2:a]atrim=6.000:9.000');
-    expect(f).toContain('[x2_0][x2_1][x2_2]concat=n=3:v=0:a=1[aout]');
+    expect(f).toContain('[x2_0][x2_1][x2_2]concat=n=3:v=0:a=1[anarr_raw]');
+    expect(f.endsWith('[aout]')).toBe(true);
+  });
+
+  it('applies the voice level here, since the mixdown is at unity', () => {
+    const f = mixFilter(CUTS, DUR, { ...opts, gain: 0.8 })!;
+    expect(f).toContain('volume=0.800[anarr]');
+    // Narration alone still ends at the one label ffmpeg maps.
+    const solo = mixFilter(CUTS, DUR, { ...opts, tabAudio: false, gain: 0.8 })!;
+    expect(solo).toContain('volume=0.800[aout]');
+    expect((solo.match(/\[aout\]/g) ?? []).length).toBe(1);
   });
 
   it('ducks the recording under the voice and mixes without renormalising', () => {

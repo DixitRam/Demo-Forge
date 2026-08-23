@@ -20,7 +20,7 @@ scripts/            make-fixture.sh — synthetic bundle with known coordinates
 
 ```sh
 pnpm install
-pnpm -r test                  # 193 tests
+pnpm -r test                  # 199 tests
 pnpm -C apps/extension build  # then load apps/extension/dist unpacked in Chrome
 pnpm -C apps/editor dev
 ```
@@ -130,11 +130,23 @@ is muxed into the export with the recording ducked underneath the voice.
 
 A few things follow from how it is wired:
 
-- **Audio is never saved.** A project file holds the words; speech is
-  regenerated from them. That keeps a project a few kilobytes instead of
-  megabytes of base64, and means editing a line invalidates only that line.
+- **Audio is saved beside the project, not inside it.** **Save project**
+  writes `<name>.dfp.json` and, when there is a voiceover,
+  `<name>.narration.wav`. Drop both back in with the video and the narration
+  plays immediately — nothing is respoken, which matters when the voice is
+  metered. The JSON stays a few readable kilobytes rather than megabytes of
+  base64, and the `.wav` is an ordinary file you can listen to or edit
+  elsewhere.
+- **A reloaded mixdown is sliced back into lines.** Each line knows its anchor
+  and how long it ran, so the track is cut up and put back in the speech
+  cache. Change one line of a reloaded project and only that line is spoken
+  again. Drop the `.wav` and everything still works — it just costs a full
+  regenerate.
 - **The mixdown is in source time**, so cuts splice it through the exact same
   filter as the tab audio. Nothing in the narration path knows what a cut is.
+- **Level is applied once, at the end.** The mixdown is at unity; the preview
+  sets it on the audio element and the export sets it with a filter, so the
+  two agree and moving the slider never forces a re-mix.
 - **A line's length is its speech**, not something you drag. Until it has been
   spoken the timeline uses a word-count estimate, marked `est.`. If lines start
   talking over each other the panel says so and offers to space them out.
@@ -162,8 +174,11 @@ A few things follow from how it is wired:
 ## Saving: the project file
 
 **Save project** (or `S`) writes `<name>.dfp.json` — the recording plus every
-edit, as plain readable JSON. Drop it back in with the video to carry on. A raw
-`demo.json` still opens too; it just gets freshly planned zooms.
+edit (zooms, captions, cuts, the narration script and the style) as plain
+readable JSON — and `<name>.narration.wav` alongside it when there is a
+voiceover. Drop the JSON, the video, and the `.wav` back in to carry on
+exactly where you were. A raw `demo.json` still opens too; it just gets
+freshly planned zooms.
 
 The schema lives in `packages/core/src/project.ts`, not in the editor, because
 the point is that the editor is not the only thing that can write one. A
@@ -175,6 +190,7 @@ captions, write it back, and the editor will render exactly that.
   "format": "demoforge-project",
   "version": 1,
   "mediaName": "recording.webm",       // referenced, not embedded
+  "narrationName": "recording.narration.wav",   // ditto; "" when there is none
   "recording": { /* the DemoRecording from capture */ },
   "zooms": [
     { "tStart": 1500, "tEnd": 3700, "targetXNorm": 0.42, "targetYNorm": 0.31,
@@ -218,10 +234,13 @@ Notes for anything editing one by hand:
   exists. Lines may overlap; that is reported, not prevented.
 - `style.voice.duck` is what the captured recording drops to while the voice
   is talking, `gain` is the voice's own level.
-- `style.voice.provider` is `"local"` or `"gemini"`; `voice` is that
-  provider's own id (`en-us+f3`, `Iapetus`). `rate` is used by the local
-  provider, `direction` by Gemini — both are always stored, so switching
-  provider and back keeps your settings.
+- `narrationName` names the rendered voiceover sitting next to the project.
+  The editor takes any dropped `.wav` as the narration, so the name is a hint
+  rather than a requirement — files get renamed.
+- `style.voice.provider` is `"local"`, `"gemini"` or `"elevenlabs"`; `voice` is that
+  `voice` is that provider's own id (`en-us+f3`, `Iapetus`, or an ElevenLabs
+  voice id). `rate` is used by the local provider, `direction` by Gemini —
+  both are always stored, so switching provider and back keeps your settings.
 - Omitting `zooms`, `captions`, `cuts`, `script` or `style` entirely is fine;
   they default.
 

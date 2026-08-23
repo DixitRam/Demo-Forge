@@ -41,11 +41,14 @@ export default function DropZone({ onLoad }: { onLoad: (p: LoadedProject) => voi
         <span className="text-lg font-medium">
           {busy ? 'Loading…' : 'Drop demo.json + recording.webm'}
         </span>
-        <span className="text-sm text-slate-400">or click to choose both files</span>
+        <span className="text-sm text-slate-400">
+          or click to choose them — reopening a saved project? add its
+          <span className="text-slate-300"> .narration.wav</span> to keep the voiceover
+        </span>
         <input
           type="file"
           multiple
-          accept=".json,.webm,.mp4"
+          accept=".json,.webm,.mp4,.wav"
           className="hidden"
           onChange={(e) => void accept([...(e.target.files ?? [])])}
         />

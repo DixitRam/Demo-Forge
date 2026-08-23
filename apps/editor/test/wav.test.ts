@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { encodeWav } from '../src/voice/wav.js';
+import { sliceRange } from '../src/voice/tts.js';
 
 const read = (b: Uint8Array, at: number): number =>
   new DataView(b.buffer, b.byteOffset, b.byteLength).getUint32(at, true);
@@ -34,5 +35,29 @@ describe('encodeWav', () => {
     expect(view.getInt16(46, true)).toBe(0); // R0
     expect(view.getInt16(48, true)).toBe(0); // L1
     expect(view.getInt16(50, true)).toBe(-32768); // R1
+  });
+});
+
+describe('sliceRange', () => {
+  const RATE = 24_000;
+  const TOTAL = 10 * RATE; // a ten second mixdown
+
+  it('finds a line by its anchor and measured length', () => {
+    expect(sliceRange(2000, 1500, RATE, TOTAL)).toEqual({ start: 48_000, length: 36_000 });
+  });
+
+  it('skips a line that was never spoken', () => {
+    expect(sliceRange(2000, undefined, RATE, TOTAL)).toBeNull();
+    expect(sliceRange(2000, 0, RATE, TOTAL)).toBeNull();
+  });
+
+  it('skips a line anchored past the end of the track', () => {
+    expect(sliceRange(11_000, 500, RATE, TOTAL)).toBeNull();
+    expect(sliceRange(-100, 500, RATE, TOTAL)).toBeNull();
+  });
+
+  it('truncates the last line rather than reading past the end', () => {
+    // A mixdown stops when the talking stops, so the final slice is short.
+    expect(sliceRange(9500, 1000, RATE, TOTAL)).toEqual({ start: 228_000, length: 12_000 });
   });
 });
