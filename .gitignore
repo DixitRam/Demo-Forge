@@ -2,3 +2,8 @@ node_modules/
 dist/
 *.tsbuildinfo
 .DS_Store
+
+# Never commit a provider key.
+.env
+.env.*
+!.env.example

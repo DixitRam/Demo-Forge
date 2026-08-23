@@ -6,7 +6,7 @@
  * Editing a line invalidates only that line.
  */
 
-import { lineKey, mixNarration, speak, ttsStatus, type ProviderStatus } from './tts.js';
+import { lineKey, mixNarration, speak, ttsProviders, type ProviderInfo } from './tts.js';
 import type { ScriptLine, VoiceStyle } from '@demoforge/core';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -16,7 +16,7 @@ export interface VoiceProgress {
 }
 
 export function useVoice(durationMs: number) {
-  const [status, setStatus] = useState<ProviderStatus | null>(null);
+  const [providers, setProviders] = useState<ProviderInfo[] | null>(null);
   const [progress, setProgress] = useState<VoiceProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [narration, setNarration] = useState<Blob | null>(null);
@@ -24,7 +24,7 @@ export function useVoice(durationMs: number) {
   const ctx = useRef<AudioContext | null>(null);
 
   useEffect(() => {
-    void ttsStatus().then(setStatus);
+    void ttsProviders().then(setProviders);
   }, []);
 
   const narrationUrl = useMemo(
@@ -79,5 +79,5 @@ export function useVoice(durationMs: number) {
     setError(null);
   }, []);
 
-  return { status, progress, error, narration, narrationUrl, generate, clear };
+  return { providers, progress, error, narration, narrationUrl, generate, clear };
 }

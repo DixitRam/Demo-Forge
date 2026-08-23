@@ -22,14 +22,30 @@ export interface ScriptLine {
   audioMs?: number;
 }
 
+/**
+ * Who speaks. `local` is espeak-ng on the machine running the dev server —
+ * free, offline, robotic. `gemini` is Google's hosted TTS, which needs a key
+ * and sounds like a person.
+ */
+export type VoiceProvider = 'local' | 'gemini';
+
 export interface VoiceStyle {
+  provider: VoiceProvider;
   /**
-   * Provider voice id. The local espeak-ng provider takes `en-us+f3`; a hosted
-   * one (ElevenLabs) will take its own ids — this stays an opaque string.
+   * Provider voice id. espeak-ng takes `en-us+f3`, Gemini takes a prebuilt
+   * name like `Iapetus` — an opaque string either way.
    */
   voice: string;
-  /** Words per minute. */
+  /**
+   * Words per minute. Only the local provider takes a number for this; a
+   * hosted voice is steered with `direction` instead.
+   */
   rate: number;
+  /**
+   * How to read it — tone, pace, accent. Free text handed to providers that
+   * understand it and ignored by the ones that do not.
+   */
+  direction: string;
   /** Narration level, 0..1. */
   gain: number;
   /** What the captured tab audio drops to while narration plays, 0..1. */
@@ -37,8 +53,10 @@ export interface VoiceStyle {
 }
 
 export const DEFAULT_VOICE: VoiceStyle = {
+  provider: 'local',
   voice: 'en-us+f3',
   rate: 170,
+  direction: '',
   gain: 1,
   duck: 0.25,
 };

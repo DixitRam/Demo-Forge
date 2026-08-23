@@ -1,11 +1,16 @@
 /**
- * Local text-to-speech for the dev server.
+ * Text-to-speech for the dev server.
  *
  * The editor is a static app with no backend, but a browser cannot spawn a
- * process — so the free provider lives here, in the Vite dev server, as one
- * endpoint that shells out to espeak-ng. It is a stand-in: robotic, instant,
- * offline, zero dependencies. Swapping in ElevenLabs later means replacing
- * what answers POST /api/tts, and nothing in the editor changes.
+ * process or hold an API key — so the providers live here, behind one
+ * endpoint:
+ *
+ *   GET  /api/tts   what can speak right now, and with which voices
+ *   POST /api/tts   {provider, text, voice, rate, direction} -> audio/wav
+ *
+ * `local` is espeak-ng on this machine: free, offline, instant, robotic.
+ * `gemini` is Google's hosted TTS: needs GEMINI_API_KEY, sounds like a person,
+ * and takes a director's note instead of a words-per-minute dial.
  *
  * ponytail: dev-server only, so a built editor has no voice provider. Fine
  * while this is a self-hosted tool you run with `pnpm dev`; the fix is the
@@ -14,13 +19,62 @@
 
 import { spawn } from 'node:child_process';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { Plugin } from 'vite';
+import { loadEnv, type Plugin } from 'vite';
 
 const BIN = 'espeak-ng';
+const DEFAULT_GEMINI_MODEL = 'gemini-3.1-flash-tts-preview';
+
 /** espeak voice ids and variants: `en-us`, `en-gb+f3`. Nothing else runs. */
-const VOICE_RE = /^[a-z0-9]([a-z0-9_-]*)(\+[a-z0-9_]+)?$/i;
+const ESPEAK_VOICE_RE = /^[a-z0-9]([a-z0-9_-]*)(\+[a-z0-9_]+)?$/i;
+/** Gemini's prebuilt voices are bare names. */
+const GEMINI_VOICE_RE = /^[A-Za-z][A-Za-z0-9]{1,31}$/;
 const MAX_TEXT = 2000;
 const MAX_BODY = 64 * 1024;
+
+export interface VoiceOption {
+  id: string;
+  label: string;
+}
+
+/** Voices that ship with every espeak-ng install, so the list is never a lie. */
+const ESPEAK_VOICES: VoiceOption[] = [
+  { id: 'en-us+f3', label: 'US · female' },
+  { id: 'en-us+f5', label: 'US · female, softer' },
+  { id: 'en-us+m3', label: 'US · male' },
+  { id: 'en-us+m7', label: 'US · male, deeper' },
+  { id: 'en-gb+f2', label: 'UK · female' },
+  { id: 'en-gb-x-rp+m3', label: 'UK · male, RP' },
+  { id: 'en-us', label: 'US · default' },
+];
+
+const GEMINI_VOICES: VoiceOption[] = [
+  { id: 'Iapetus', label: 'Iapetus · clear' },
+  { id: 'Charon', label: 'Charon · informative' },
+  { id: 'Kore', label: 'Kore · firm' },
+  { id: 'Puck', label: 'Puck · upbeat' },
+  { id: 'Zephyr', label: 'Zephyr · bright' },
+  { id: 'Aoede', label: 'Aoede · breezy' },
+  { id: 'Leda', label: 'Leda · youthful' },
+  { id: 'Achird', label: 'Achird · friendly' },
+  { id: 'Sulafat', label: 'Sulafat · warm' },
+  { id: 'Algieba', label: 'Algieba · smooth' },
+  { id: 'Erinome', label: 'Erinome · clear' },
+  { id: 'Schedar', label: 'Schedar · even' },
+];
+
+export interface ProviderInfo {
+  id: 'local' | 'gemini';
+  label: string;
+  ok: boolean;
+  error?: string;
+  voices: VoiceOption[];
+  /** Whether the provider takes a words-per-minute number. */
+  rate: boolean;
+  /** Whether it takes a free-text director's note. */
+  direction: boolean;
+}
+
+// --- shared ----------------------------------------------------------------
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -33,6 +87,27 @@ function readBody(req: IncomingMessage): Promise<string> {
     req.on('error', reject);
   });
 }
+
+/** http://soundfile.sapp.org/doc/WaveFormat */
+function wavHeader(dataLength: number, channels: number, rate: number, bits: number): Buffer {
+  const h = Buffer.alloc(44);
+  h.write('RIFF', 0);
+  h.writeUInt32LE(36 + dataLength, 4);
+  h.write('WAVE', 8);
+  h.write('fmt ', 12);
+  h.writeUInt32LE(16, 16);
+  h.writeUInt16LE(1, 20); // PCM
+  h.writeUInt16LE(channels, 22);
+  h.writeUInt32LE(rate, 24);
+  h.writeUInt32LE((rate * channels * bits) / 8, 28);
+  h.writeUInt16LE((channels * bits) / 8, 32);
+  h.writeUInt16LE(bits, 34);
+  h.write('data', 36);
+  h.writeUInt32LE(dataLength, 40);
+  return h;
+}
+
+// --- espeak-ng -------------------------------------------------------------
 
 /**
  * espeak-ng writing to a pipe cannot seek back to fill in the RIFF sizes, so
@@ -48,7 +123,7 @@ function fixWavLengths(wav: Buffer): Buffer {
   return wav;
 }
 
-function speak(text: string, voice: string, rate: number): Promise<Buffer> {
+function speakLocal(text: string, voice: string, rate: number): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     // Args as an array, never a shell string: the text is user input.
     const p = spawn(BIN, ['-v', voice, '-s', String(rate), '--stdout'], {
@@ -71,7 +146,7 @@ function speak(text: string, voice: string, rate: number): Promise<Buffer> {
   });
 }
 
-function probe(): Promise<boolean> {
+function haveEspeak(): Promise<boolean> {
   return new Promise((resolve) => {
     const p = spawn(BIN, ['--version'], { stdio: 'ignore' });
     p.on('error', () => resolve(false));
@@ -79,17 +154,128 @@ function probe(): Promise<boolean> {
   });
 }
 
-async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
+// --- gemini ----------------------------------------------------------------
+
+/**
+ * Gemini returns raw PCM described by a mime type like
+ * `audio/L16;codec=pcm;rate=24000`, so the WAV header is ours to write.
+ */
+export function pcmFormat(mimeType: string): { rate: number; bits: number; channels: number } {
+  const [type, ...params] = mimeType.split(';').map((s) => s.trim());
+  const bits = Number.parseInt(type?.split('/')[1]?.replace(/^L/i, '') ?? '', 10);
+  const rate = params
+    .map((p) => p.split('=').map((x) => x.trim()))
+    .find(([k]) => k === 'rate')?.[1];
+  return {
+    rate: Number.parseInt(rate ?? '', 10) || 24_000,
+    bits: Number.isFinite(bits) && bits > 0 ? bits : 16,
+    channels: 1,
+  };
+}
+
+/**
+ * The director's note goes in the same prompt as the words — that is how this
+ * model is steered. Without one it just reads the line.
+ */
+export function geminiPrompt(text: string, direction: string): string {
+  const note = direction.trim();
+  return note ? `${note}\n\nRead this aloud, and say nothing else:\n${text}` : text;
+}
+
+async function speakGemini(
+  text: string,
+  voice: string,
+  direction: string,
+  apiKey: string,
+  model: string,
+): Promise<Buffer> {
+  const { GoogleGenAI } = await import('@google/genai');
+  const ai = new GoogleGenAI({ apiKey });
+
+  const stream = await ai.models.generateContentStream({
+    model,
+    config: {
+      responseModalities: ['audio'],
+      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
+    },
+    contents: [{ role: 'user', parts: [{ text: geminiPrompt(text, direction) }] }],
+  });
+
+  const chunks: Buffer[] = [];
+  let mimeType = '';
+  for await (const chunk of stream) {
+    for (const part of chunk.candidates?.[0]?.content?.parts ?? []) {
+      const inline = part.inlineData;
+      if (!inline?.data) continue;
+      mimeType ||= inline.mimeType ?? '';
+      chunks.push(Buffer.from(inline.data, 'base64'));
+    }
+  }
+
+  const pcm = Buffer.concat(chunks);
+  if (pcm.length === 0) throw new Error('Gemini returned no audio for that line.');
+  // A model that hands back a container already needs no header from us.
+  if (/wav/i.test(mimeType)) return pcm;
+  const f = pcmFormat(mimeType);
+  return Buffer.concat([wavHeader(pcm.length, f.channels, f.rate, f.bits), pcm]);
+}
+
+/**
+ * Google nests its error JSON inside the SDK's message string, sometimes
+ * twice over. Dig out the sentence a person can act on.
+ */
+export function readableError(e: unknown): string {
+  let msg = e instanceof Error ? e.message : String(e);
+  for (let i = 0; i < 3; i++) {
+    let inner: string | undefined;
+    try {
+      inner = (JSON.parse(msg) as { error?: { message?: string } }).error?.message;
+    } catch {
+      break;
+    }
+    if (typeof inner !== 'string') break;
+    msg = inner;
+  }
+  return msg.trim() || 'Speech failed.';
+}
+
+// --- endpoint --------------------------------------------------------------
+
+function providers(apiKey: string, espeak: boolean): ProviderInfo[] {
+  return [
+    {
+      id: 'local',
+      label: 'espeak-ng (local)',
+      ok: espeak,
+      ...(espeak ? {} : { error: 'espeak-ng is not installed on this machine.' }),
+      voices: ESPEAK_VOICES,
+      rate: true,
+      direction: false,
+    },
+    {
+      id: 'gemini',
+      label: 'Gemini AI',
+      ok: apiKey !== '',
+      ...(apiKey ? {} : { error: 'GEMINI_API_KEY is not set for the dev server.' }),
+      voices: GEMINI_VOICES,
+      rate: false,
+      direction: true,
+    },
+  ];
+}
+
+async function handle(
+  req: IncomingMessage,
+  res: ServerResponse,
+  env: Record<string, string>,
+): Promise<void> {
+  const apiKey = env.GEMINI_API_KEY ?? '';
+  const model = env.GEMINI_TTS_MODEL || DEFAULT_GEMINI_MODEL;
+
   if (req.method === 'GET') {
-    const ok = await probe();
     res.setHeader('Content-Type', 'application/json');
-    res.end(
-      JSON.stringify(
-        ok
-          ? { ok: true, provider: 'espeak-ng' }
-          : { ok: false, error: 'espeak-ng is not installed on this machine.' },
-      ),
-    );
+    // The key itself never leaves the server — only whether there is one.
+    res.end(JSON.stringify({ providers: providers(apiKey, await haveEspeak()) }));
     return;
   }
   if (req.method !== 'POST') {
@@ -107,15 +293,25 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   try {
     const body = JSON.parse(await readBody(req)) as Record<string, unknown>;
     const text = typeof body.text === 'string' ? body.text.trim() : '';
-    const voice = typeof body.voice === 'string' ? body.voice : 'en-us';
-    const rate = Math.round(Number(body.rate));
+    const voice = typeof body.voice === 'string' ? body.voice : '';
+    const direction = typeof body.direction === 'string' ? body.direction.slice(0, 600) : '';
+    const provider = body.provider === 'gemini' ? 'gemini' : 'local';
 
     if (!text) return fail(400, 'Nothing to say.');
     if (text.length > MAX_TEXT) return fail(400, `Line is longer than ${MAX_TEXT} characters.`);
-    if (!VOICE_RE.test(voice)) return fail(400, `Not a voice id: ${voice}`);
-    if (!Number.isFinite(rate) || rate < 60 || rate > 450) return fail(400, 'Rate out of range.');
 
-    const wav = await speak(text, voice, rate);
+    let wav: Buffer;
+    if (provider === 'gemini') {
+      if (!apiKey) return fail(503, 'GEMINI_API_KEY is not set for the dev server.');
+      if (!GEMINI_VOICE_RE.test(voice)) return fail(400, `Not a Gemini voice: ${voice}`);
+      wav = await speakGemini(text, voice, direction, apiKey, model);
+    } else {
+      const rate = Math.round(Number(body.rate));
+      if (!ESPEAK_VOICE_RE.test(voice)) return fail(400, `Not a voice id: ${voice}`);
+      if (!Number.isFinite(rate) || rate < 60 || rate > 450) return fail(400, 'Rate out of range.');
+      wav = await speakLocal(text, voice, rate);
+    }
+
     res.setHeader('Content-Type', 'audio/wav');
     res.setHeader('Content-Length', String(wav.length));
     // The page is cross-origin isolated for ffmpeg.wasm; same-origin fetches
@@ -123,15 +319,21 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
     res.end(wav);
   } catch (e) {
-    fail(500, e instanceof Error ? e.message : 'Speech failed.');
+    fail(500, readableError(e));
   }
 }
 
 export function ttsPlugin(): Plugin {
+  let env: Record<string, string> = {};
   return {
     name: 'demoforge-tts',
+    configResolved(config) {
+      // '' loads every variable, not just VITE_ ones — this runs on the server
+      // and the key must never be handed to the client.
+      env = loadEnv(config.mode, config.envDir ?? process.cwd(), '');
+    },
     configureServer(server) {
-      server.middlewares.use('/api/tts', (req, res) => void handle(req, res));
+      server.middlewares.use('/api/tts', (req, res) => void handle(req, res, env));
     },
   };
 }

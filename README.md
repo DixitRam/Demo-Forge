@@ -20,13 +20,18 @@ scripts/            make-fixture.sh — synthetic bundle with known coordinates
 
 ```sh
 pnpm install
-pnpm -r test                  # 178 tests
+pnpm -r test                  # 188 tests
 pnpm -C apps/extension build  # then load apps/extension/dist unpacked in Chrome
 pnpm -C apps/editor dev
 ```
 
-Narration needs `espeak-ng` on `PATH` (`dnf install espeak-ng`). Nothing else
-does — the editor tells you if it is missing and everything else keeps working.
+Narration needs a voice provider; nothing else does, and the editor tells you
+which ones are available.
+
+- **espeak-ng (local)** — `dnf install espeak-ng`. Free, offline, robotic.
+- **Gemini AI** — copy `.env.example` to `.env` and put a key in
+  `GEMINI_API_KEY`. Sounds like a person. The key is read by the dev server
+  only and never reaches the browser.
 
 ## The workflow
 
@@ -123,10 +128,20 @@ A few things follow from how it is wired:
 - **A line's length is its speech**, not something you drag. Until it has been
   spoken the timeline uses a word-count estimate, marked `est.`. If lines start
   talking over each other the panel says so and offers to space them out.
-- **The provider is one function.** Today it is `POST /api/tts` in the Vite dev
-  server shelling out to espeak-ng (`apps/editor/vite-tts.ts`) — robotic,
-  instant, offline. Swapping in ElevenLabs means replacing what answers that
-  request; the mixdown, the timeline and the exporter do not change.
+- **Providers live behind one endpoint.** `GET /api/tts` says who can speak
+  and with which voices; `POST /api/tts` returns WAV
+  (`apps/editor/vite-tts.ts`). The panel renders whatever the server reports,
+  so adding a provider is a server-side change. The mixdown, the timeline and
+  the exporter never learn who spoke.
+- **Different providers take different dials.** espeak-ng takes words per
+  minute; Gemini takes a **director's note** — free text describing tone, pace
+  and accent, handed to the model alongside the line. The panel shows only the
+  dials the chosen provider actually uses, and switching provider or note
+  re-speaks the affected lines.
+- **Gemini returns raw PCM** (`audio/L16;rate=24000`), so the WAV header is
+  written server-side before the audio ever reaches the browser.
+- **"Available" means a key is configured**, not that it works — a bad key
+  surfaces as the provider's own error the first time you generate.
 
 ## Saving: the project file
 
@@ -160,7 +175,8 @@ captions, write it back, and the editor will render exactly that.
              "cursor": { "show": true, "size": 0.045, "smoothing": 0.4, "clicks": true },
              "captions": { "size": 0.045, "position": "bottom", "color": "#ffffff",
                            "background": "rgba(2,6,23,0.72)" },
-             "voice": { "voice": "en-us+f3", "rate": 170, "gain": 1, "duck": 0.25 } }
+             "voice": { "provider": "local", "voice": "en-us+f3", "rate": 170,
+                        "direction": "", "gain": 1, "duck": 0.25 } }
 }
 ```
 
@@ -186,6 +202,10 @@ Notes for anything editing one by hand:
   exists. Lines may overlap; that is reported, not prevented.
 - `style.voice.duck` is what the captured recording drops to while the voice
   is talking, `gain` is the voice's own level.
+- `style.voice.provider` is `"local"` or `"gemini"`; `voice` is that
+  provider's own id (`en-us+f3`, `Iapetus`). `rate` is used by the local
+  provider, `direction` by Gemini — both are always stored, so switching
+  provider and back keeps your settings.
 - Omitting `zooms`, `captions`, `cuts`, `script` or `style` entirely is fine;
   they default.
 
@@ -227,7 +247,7 @@ For recording-side timing, see `apps/extension/README.md`.
 - **ffmpeg.wasm export** holds every frame in memory until the encode runs.
   Fine for a 30 s demo; a server-side render is the upgrade path.
 - **Pill handles** stay inside the pill, so a very short zoom is fiddly to grab.
-- **The voice provider is dev-server only**, so a statically built editor has
+- **Voice providers are dev-server only**, so a statically built editor has
   none. Fine while this is a tool you run with `pnpm dev`; the fix is the same
   backend the Phase 2 TODO already calls for.
 - **Ducking is a constant**, not a sidechain compressor — right when the tab

@@ -1,28 +1,40 @@
 /**
  * Speech for the narration script.
  *
- * One provider today — the dev server's espeak-ng endpoint (see vite-tts.ts).
- * `speak()` is the whole seam: point it at a hosted provider and everything
- * above it, including the mixdown and the exporter, is unchanged.
+ * Every provider lives behind one dev-server endpoint (see vite-tts.ts), which
+ * also says which of them can actually speak right now. `speak()` is the whole
+ * seam: the mixdown, the timeline and the exporter never learn who spoke.
  */
 
-import type { ScriptLine, VoiceStyle } from '@demoforge/core';
+import type { ScriptLine, VoiceProvider, VoiceStyle } from '@demoforge/core';
 import { encodeWav } from './wav.js';
 
 const ENDPOINT = '/api/tts';
 
-export interface ProviderStatus {
-  ok: boolean;
-  provider?: string;
-  error?: string;
+export interface VoiceOption {
+  id: string;
+  label: string;
 }
 
-export async function ttsStatus(): Promise<ProviderStatus> {
+export interface ProviderInfo {
+  id: VoiceProvider;
+  label: string;
+  ok: boolean;
+  error?: string;
+  voices: VoiceOption[];
+  /** Takes a words-per-minute number. */
+  rate: boolean;
+  /** Takes a free-text director's note. */
+  direction: boolean;
+}
+
+export async function ttsProviders(): Promise<ProviderInfo[]> {
   try {
     const res = await fetch(ENDPOINT);
-    return (await res.json()) as ProviderStatus;
+    const body = (await res.json()) as { providers?: ProviderInfo[] };
+    return body.providers ?? [];
   } catch {
-    return { ok: false, error: 'No speech provider on this server.' };
+    return [];
   }
 }
 
@@ -31,7 +43,13 @@ export async function speak(text: string, voice: VoiceStyle): Promise<ArrayBuffe
   const res = await fetch(ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, voice: voice.voice, rate: Math.round(voice.rate) }),
+    body: JSON.stringify({
+      text,
+      provider: voice.provider,
+      voice: voice.voice,
+      rate: Math.round(voice.rate),
+      direction: voice.direction,
+    }),
   });
   if (!res.ok) {
     const detail = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -42,7 +60,13 @@ export async function speak(text: string, voice: VoiceStyle): Promise<ArrayBuffe
 
 /** Identity of a rendering of a line: change any of it and it must be respoken. */
 export function lineKey(text: string, voice: VoiceStyle): string {
-  return `${voice.voice}|${Math.round(voice.rate)}|${text.trim()}`;
+  return [
+    voice.provider,
+    voice.voice,
+    Math.round(voice.rate),
+    voice.direction.trim(),
+    text.trim(),
+  ].join('|');
 }
 
 /**

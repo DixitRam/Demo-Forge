@@ -1,8 +1,14 @@
 packages:
   - 'packages/*'
   - 'apps/*'
+
+# esbuild needs its postinstall to fetch its binary. The Gemini SDK and its
+# transitive protobufjs do not need theirs for the REST path we use, and not
+# running them is one less install-time script.
 allowBuilds:
-  esbuild: set this to true or false
+  esbuild: true
+  '@google/genai': false
+  protobufjs: false
 
 onlyBuiltDependencies:
   - esbuild

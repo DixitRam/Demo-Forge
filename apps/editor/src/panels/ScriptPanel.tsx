@@ -14,21 +14,14 @@ import {
   spaceOutScript,
 } from '../timeline/scriptOps.js';
 import type { VoiceProgress } from '../voice/useVoice.js';
-import type { ProviderStatus } from '../voice/tts.js';
+import type { ProviderInfo } from '../voice/tts.js';
 import { Section, Slider } from './controls.js';
 
-/**
- * Voices that ship with every espeak-ng install, so the list is never a lie.
- * A hosted provider would fill this from its own catalogue.
- */
-const VOICES: Array<{ id: string; label: string }> = [
-  { id: 'en-us+f3', label: 'US · female' },
-  { id: 'en-us+f5', label: 'US · female, softer' },
-  { id: 'en-us+m3', label: 'US · male' },
-  { id: 'en-us+m7', label: 'US · male, deeper' },
-  { id: 'en-gb+f2', label: 'UK · female' },
-  { id: 'en-gb-x-rp+m3', label: 'UK · male, RP' },
-  { id: 'en-us', label: 'US · default' },
+/** Starting points for a director's note; it is free text, not a menu. */
+const DIRECTIONS: string[] = [
+  'A clear, friendly product walkthrough narrator. Measured pace, warm and articulate.',
+  'An authoritative corporate trainer. Newscaster style, deliberate pauses.',
+  'An enthusiastic founder demoing their own product. Quick, upbeat, conversational.',
 ];
 
 interface Props {
@@ -41,7 +34,7 @@ interface Props {
   onSelect: (i: number | null) => void;
   timeMs: number;
   onSeek: (ms: number) => void;
-  status: ProviderStatus | null;
+  providers: ProviderInfo[] | null;
   progress: VoiceProgress | null;
   error: string | null;
   hasNarration: boolean;
@@ -63,9 +56,34 @@ export default function ScriptPanel(p: Props) {
   const unspoken = p.script.filter((l) => l.audioMs === undefined).length;
   const busy = p.progress !== null;
 
+  const provider = p.providers?.find((x) => x.id === v.provider) ?? null;
+  const voices = provider?.voices ?? [];
+
   return (
     <div className="flex flex-col gap-5">
       <Section label="Voice">
+        {p.providers && (
+          <div className="flex gap-1 rounded-lg bg-slate-900 p-1">
+            {p.providers.map((x) => (
+              <button
+                key={x.id}
+                onClick={() =>
+                  setV({ provider: x.id, voice: x.voices[0]?.id ?? v.voice })
+                }
+                title={x.ok ? x.label : x.error}
+                className={`flex-1 rounded-md px-2 py-1 transition ${
+                  v.provider === x.id
+                    ? 'bg-emerald-500/90 font-medium text-slate-950'
+                    : 'text-slate-400 hover:text-slate-200'
+                } ${x.ok ? '' : 'opacity-60'}`}
+              >
+                {x.label}
+                {!x.ok && ' ·  ⚠'}
+              </button>
+            ))}
+          </div>
+        )}
+
         <label className="flex flex-col gap-1">
           <span className="text-slate-400">Voice</span>
           <select
@@ -73,23 +91,54 @@ export default function ScriptPanel(p: Props) {
             onChange={(e) => setV({ voice: e.target.value })}
             className="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-slate-100 outline-none focus:border-sky-500"
           >
-            {VOICES.map((o) => (
+            {voices.map((o) => (
               <option key={o.id} value={o.id}>
                 {o.label}
               </option>
             ))}
-            {!VOICES.some((o) => o.id === v.voice) && <option value={v.voice}>{v.voice}</option>}
+            {!voices.some((o) => o.id === v.voice) && <option value={v.voice}>{v.voice}</option>}
           </select>
         </label>
-        <Slider
-          label="Speed"
-          value={v.rate}
-          min={100}
-          max={260}
-          step={5}
-          onChange={(rate) => setV({ rate })}
-          format={(x) => `${Math.round(x)} wpm`}
-        />
+
+        {provider?.rate !== false && (
+          <Slider
+            label="Speed"
+            value={v.rate}
+            min={100}
+            max={260}
+            step={5}
+            onChange={(rate) => setV({ rate })}
+            format={(x) => `${Math.round(x)} wpm`}
+          />
+        )}
+
+        {provider?.direction && (
+          <label className="flex flex-col gap-1">
+            <span className="flex items-center justify-between text-slate-400">
+              How to read it
+              <select
+                value=""
+                onChange={(e) => e.target.value && setV({ direction: e.target.value })}
+                className="rounded bg-slate-800 px-1 py-0.5 text-[10px] text-slate-300"
+              >
+                <option value="">presets…</option>
+                {DIRECTIONS.map((d, i) => (
+                  <option key={i} value={d}>
+                    {d.split('.')[0]}
+                  </option>
+                ))}
+              </select>
+            </span>
+            <textarea
+              value={v.direction}
+              rows={3}
+              placeholder="Tone, pace, accent — handed to the model with the line."
+              onChange={(e) => setV({ direction: e.target.value })}
+              className="w-full resize-none rounded-lg border border-slate-700 bg-slate-900 p-2 text-[11px] leading-relaxed text-slate-100 outline-none focus:border-sky-500"
+            />
+          </label>
+        )}
+
         <Slider
           label="Narration level"
           value={v.gain}
@@ -136,7 +185,7 @@ export default function ScriptPanel(p: Props) {
 
         <button
           onClick={p.onGenerate}
-          disabled={busy || p.script.length === 0 || p.status?.ok === false}
+          disabled={busy || p.script.length === 0 || provider?.ok === false}
           className="rounded-lg bg-sky-500/90 py-2 font-medium text-slate-950 hover:bg-sky-400 disabled:opacity-40"
         >
           {busy
@@ -152,10 +201,12 @@ export default function ScriptPanel(p: Props) {
             recording ducked underneath.
           </p>
         )}
-        {p.status?.ok === false && (
+        {provider?.ok === false && (
           <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] leading-relaxed text-amber-300">
-            {p.status.error} Install it (<code>dnf install espeak-ng</code>) and restart the dev
-            server.
+            {provider.error}{' '}
+            {provider.id === 'gemini'
+              ? 'Put GEMINI_API_KEY in a .env file at the repo root and restart the dev server.'
+              : 'Install it (dnf install espeak-ng) and restart the dev server.'}
           </p>
         )}
         {p.error && (

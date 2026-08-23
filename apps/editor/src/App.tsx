@@ -198,7 +198,7 @@ export default function App() {
           script={script}
           setScript={setScript}
           onSeek={seek}
-          voiceStatus={voice.status}
+          voiceProviders={voice.providers}
           voiceProgress={voice.progress}
           voiceError={voice.error}
           hasNarration={voice.narration !== null}

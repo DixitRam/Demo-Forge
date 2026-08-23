@@ -54,7 +54,7 @@ export {
   scriptSlotAt,
   sortScript,
 } from './script.js';
-export type { ScriptDraftConfig, ScriptLine, VoiceStyle } from './script.js';
+export type { ScriptDraftConfig, ScriptLine, VoiceProvider, VoiceStyle } from './script.js';
 
 export type {
   CaptionCue,

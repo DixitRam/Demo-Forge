@@ -9,7 +9,7 @@ import EffectsPanel from './EffectsPanel.js';
 import LayoutPanel from './LayoutPanel.js';
 import ScriptPanel from './ScriptPanel.js';
 import ZoomPanel from './ZoomPanel.js';
-import type { ProviderStatus } from '../voice/tts.js';
+import type { ProviderInfo } from '../voice/tts.js';
 import type { VoiceProgress } from '../voice/useVoice.js';
 import {
   IconCaption,
@@ -44,7 +44,7 @@ interface Props {
   script: ScriptLine[];
   setScript: (s: ScriptLine[]) => void;
   onSeek: (ms: number) => void;
-  voiceStatus: ProviderStatus | null;
+  voiceProviders: ProviderInfo[] | null;
   voiceProgress: VoiceProgress | null;
   voiceError: string | null;
   hasNarration: boolean;
@@ -91,7 +91,7 @@ export default function Sidebar(p: Props) {
                 onSelect={(i) => p.onSelect(i === null ? null : { kind: 'script', index: i })}
                 timeMs={p.timeMs}
                 onSeek={p.onSeek}
-                status={p.voiceStatus}
+                providers={p.voiceProviders}
                 progress={p.voiceProgress}
                 error={p.voiceError}
                 hasNarration={p.hasNarration}
