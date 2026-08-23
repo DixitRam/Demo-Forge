@@ -1,17 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_STYLE,
+  MIN_TRIM_MS,
   PROJECT_FORMAT,
+  clampTrim,
   createProject,
+  effectiveTrim,
   isProject,
   parseProject,
 } from '../src/project.js';
 import { planZooms } from '../src/zoom-planner.js';
 import { SAMPLE } from './fixtures/sample-recording.js';
 
-const project = createProject(SAMPLE, 'recording.webm', planZooms(SAMPLE), [
-  { tStart: 1000, tEnd: 3000, text: 'Open the dashboard' },
-]);
+const DUR = SAMPLE.video.durationMs;
+
+const project = createProject(
+  SAMPLE,
+  'recording.webm',
+  planZooms(SAMPLE),
+  [{ tStart: 1000, tEnd: 3000, text: 'Open the dashboard' }],
+  { startMs: 1000, endMs: 12_000 },
+);
 
 describe('project round-trip', () => {
   it('survives JSON serialisation unchanged', () => {
@@ -21,6 +30,7 @@ describe('project round-trip', () => {
     expect(back.style).toEqual(project.style);
     expect(back.recording.events).toEqual(SAMPLE.events);
     expect(back.mediaName).toBe('recording.webm');
+    expect(back.trim).toEqual({ startMs: 1000, endMs: 12_000 });
   });
 
   it('is recognisable without being fully parsed', () => {
@@ -111,5 +121,48 @@ describe('parseProject repairs a hand-edited file', () => {
     expect(p.zooms).toEqual([]);
     expect(p.captions).toEqual([]);
     expect(p.style).toEqual(DEFAULT_STYLE);
+  });
+});
+
+describe('trim', () => {
+  it('treats a span covering the whole recording as no trim', () => {
+    expect(createProject(SAMPLE, 'r.webm', [], [], { startMs: 0, endMs: DUR }).trim).toEqual({
+      startMs: 0,
+      endMs: DUR,
+    });
+    // …but a round-trip through the parser normalises it away.
+    expect(parseProject({ ...project, trim: { startMs: 0, endMs: DUR } }).trim).toBeNull();
+    expect(parseProject({ ...project, trim: null }).trim).toBeNull();
+  });
+
+  it('falls back to the whole recording when absent', () => {
+    expect(effectiveTrim(null, DUR)).toEqual({ startMs: 0, endMs: DUR });
+  });
+
+  it('keeps the span inside the recording and at least MIN_TRIM_MS long', () => {
+    expect(clampTrim({ startMs: -5000, endMs: 999_999 }, DUR)).toEqual({
+      startMs: 0,
+      endMs: DUR,
+    });
+    expect(clampTrim({ startMs: 8000, endMs: 8000 }, DUR)).toEqual({
+      startMs: 8000,
+      endMs: 8000 + MIN_TRIM_MS,
+    });
+  });
+
+  it('never returns an inverted span, however it was written', () => {
+    const t = clampTrim({ startMs: 12_000, endMs: 3000 }, DUR);
+    expect(t.endMs).toBeGreaterThan(t.startMs);
+  });
+
+  it('pulls a start that would leave no room back off the end', () => {
+    const t = clampTrim({ startMs: DUR, endMs: DUR }, DUR);
+    expect(t.startMs).toBe(DUR - MIN_TRIM_MS);
+    expect(t.endMs).toBe(DUR);
+  });
+
+  it('survives garbage from a hand-edited file', () => {
+    const p = parseProject({ ...project, trim: { startMs: 'soon', endMs: Number.NaN } });
+    expect(p.trim).toBeNull();
   });
 });

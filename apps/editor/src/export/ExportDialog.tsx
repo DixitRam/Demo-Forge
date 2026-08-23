@@ -1,4 +1,4 @@
-import type { CaptionCue, ZoomKeyframe } from '@demoforge/core';
+import { effectiveTrim, type CaptionCue, type Trim, type ZoomKeyframe } from '@demoforge/core';
 import { useRef, useState } from 'react';
 import type { LoadedProject } from '../import/loadRecording.js';
 import type { FrameStyle } from '../render/style.js';
@@ -10,10 +10,11 @@ interface Props {
   project: LoadedProject;
   keyframes: readonly ZoomKeyframe[];
   captions: readonly CaptionCue[];
+  trim: Trim | null;
   style: FrameStyle;
 }
 
-export default function ExportDialog({ project, keyframes, captions, style }: Props) {
+export default function ExportDialog({ project, keyframes, captions, trim, style }: Props) {
   const [open, setOpen] = useState(false);
   const [fps, setFps] = useState(30);
   const [stage, setStage] = useState<string | null>(null);
@@ -33,6 +34,7 @@ export default function ExportDialog({ project, keyframes, captions, style }: Pr
         media: project.media,
         keyframes,
         captions,
+        trim,
         style,
         fps,
         signal: abort.current.signal,
@@ -65,6 +67,14 @@ export default function ExportDialog({ project, keyframes, captions, style }: Pr
 
   return (
     <div className="ml-auto flex items-center gap-3 text-xs">
+      <span className="text-slate-500">
+        {(
+          (effectiveTrim(trim, project.rec.video.durationMs).endMs -
+            effectiveTrim(trim, project.rec.video.durationMs).startMs) /
+          1000
+        ).toFixed(1)}
+        s
+      </span>
       <label className="flex items-center gap-1 text-slate-400">
         fps
         <select

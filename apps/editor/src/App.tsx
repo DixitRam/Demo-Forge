@@ -1,3 +1,4 @@
+import { clampTrim, effectiveTrim } from '@demoforge/core';
 import { useMemo, useState } from 'react';
 import ExportDialog from './export/ExportDialog.js';
 import { useHotkeys } from './hooks.js';
@@ -20,6 +21,8 @@ export default function App() {
     setKeyframes,
     captions,
     setCaptions,
+    trim,
+    setTrim,
     style,
     setStyle,
     load,
@@ -56,6 +59,8 @@ export default function App() {
           video.paused ? void video.play() : video.pause();
         },
         z: () => setAddZoom((n) => n + 1),
+        i: () => setTrim(clampTrim({ ...effectiveTrim(trim, duration), startMs: timeMs }, duration)),
+        o: () => setTrim(clampTrim({ ...effectiveTrim(trim, duration), endMs: timeMs }, duration)),
         c: () => setAddCaption((n) => n + 1),
         s: () => save(),
         ArrowLeft: () => seek(timeMs - FRAME_MS),
@@ -69,7 +74,7 @@ export default function App() {
         Backspace: deleteSelected,
       }),
       // eslint-disable-next-line react-hooks/exhaustive-deps
-      [video, timeMs, duration, selection, keyframes, captions, save],
+      [video, timeMs, duration, selection, keyframes, captions, trim, save],
     ),
   );
 
@@ -101,7 +106,13 @@ export default function App() {
         >
           Save project
         </button>
-        <ExportDialog project={project} keyframes={active} captions={captions} style={style} />
+        <ExportDialog
+          project={project}
+          keyframes={active}
+          captions={captions}
+          trim={trim}
+          style={style}
+        />
       </header>
 
       <div className="flex min-h-0 flex-1">
@@ -110,6 +121,7 @@ export default function App() {
             project={project}
             keyframes={preview}
             captions={captions}
+            trim={trim}
             style={style}
             onTime={setTimeMs}
             overlay={
@@ -174,6 +186,8 @@ export default function App() {
           setKeyframes={setKeyframes}
           captions={captions}
           setCaptions={setCaptions}
+          trim={trim}
+          setTrim={setTrim}
           timeMs={timeMs}
           onSeek={seek}
           selection={selection}

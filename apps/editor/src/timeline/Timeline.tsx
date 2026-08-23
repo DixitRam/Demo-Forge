@@ -1,4 +1,4 @@
-import type { CaptionCue, DemoRecording, ZoomKeyframe } from '@demoforge/core';
+import { effectiveTrim, clampTrim, type CaptionCue, type DemoRecording, type Trim, type ZoomKeyframe } from '@demoforge/core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { captionSlotAt, insertCaption, moveCaption } from './captionOps.js';
 import { applyDrag, freeSlotAt, insertZoom, snapWithin, type DragMode } from './kfOps.js';
@@ -19,6 +19,8 @@ interface Props {
   setKeyframes: (kfs: ZoomKeyframe[]) => void;
   captions: CaptionCue[];
   setCaptions: (c: CaptionCue[]) => void;
+  trim: Trim | null;
+  setTrim: (t: Trim | null) => void;
   timeMs: number;
   onSeek: (ms: number) => void;
   selection: Selection;
@@ -42,6 +44,8 @@ export default function Timeline({
   setKeyframes,
   captions,
   setCaptions,
+  trim,
+  setTrim,
   timeMs,
   onSeek,
   selection,
@@ -50,6 +54,8 @@ export default function Timeline({
   addZoomSignal,
   addCaptionSignal,
 }: Props) {
+  const keep = effectiveTrim(trim, Math.max(1, rec.video.durationMs));
+  const trimmed = trim !== null;
   const selZoom = selection?.kind === 'zoom' ? selection.index : null;
   const selCaption = selection?.kind === 'caption' ? selection.index : null;
   const duration = Math.max(1, rec.video.durationMs);
@@ -131,6 +137,33 @@ export default function Timeline({
     );
   };
 
+  const trimBase = useRef<Trim | null>(null);
+
+  const onTrimDrag = (edge: 'start' | 'end') => (e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    trimBase.current = keep;
+    const el = e.currentTarget as HTMLElement;
+    el.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent): void => {
+      const at = toMs(ev.clientX);
+      const from = trimBase.current!;
+      setTrim(
+        clampTrim(
+          edge === 'start' ? { ...from, startMs: at } : { ...from, endMs: at },
+          duration,
+        ),
+      );
+    };
+    const up = (): void => {
+      el.releasePointerCapture(e.pointerId);
+      el.removeEventListener('pointermove', move);
+      el.removeEventListener('pointerup', up);
+    };
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', up);
+  };
+
   const onCaptionDrag = (index: number, mode: DragMode, deltaMs: number): void => {
     capBase.current ??= captions;
     setCaptions(moveCaption(capBase.current, index, mode, deltaMs, duration));
@@ -206,6 +239,27 @@ export default function Timeline({
           className="rounded bg-slate-800 px-2 py-0.5 text-slate-200 hover:bg-slate-700 disabled:opacity-40"
         >
           Delete
+        </button>
+        <button
+          onClick={() => setTrim(clampTrim({ ...keep, startMs: timeMs }, duration))}
+          title="Trim the start to the playhead"
+          className="rounded bg-slate-800 px-2 py-0.5 text-slate-200 hover:bg-slate-700"
+        >
+          Set in <kbd className="text-slate-500">I</kbd>
+        </button>
+        <button
+          onClick={() => setTrim(clampTrim({ ...keep, endMs: timeMs }, duration))}
+          title="Trim the end to the playhead"
+          className="rounded bg-slate-800 px-2 py-0.5 text-slate-200 hover:bg-slate-700"
+        >
+          Set out <kbd className="text-slate-500">O</kbd>
+        </button>
+        <button
+          onClick={() => setTrim(null)}
+          disabled={!trimmed}
+          className="rounded bg-slate-800 px-2 py-0.5 text-slate-200 hover:bg-slate-700 disabled:opacity-40"
+        >
+          Reset trim
         </button>
         <button
           onClick={() => setView(fullView(duration))}
@@ -334,6 +388,30 @@ export default function Timeline({
               <span className="truncate">{mediaName}</span>
             </div>
           </div>
+
+          {/* What the export will drop, shaded across every lane. */}
+          <div className="pointer-events-none absolute top-6 right-4 bottom-0 left-0">
+            <div
+              style={{ left: 0, width: Math.max(0, toPx(keep.startMs)) }}
+              className="absolute inset-y-0 bg-slate-950/70"
+            />
+            <div
+              style={{ left: toPx(keep.endMs), right: 0 }}
+              className="absolute inset-y-0 bg-slate-950/70"
+            />
+          </div>
+          {(['start', 'end'] as const).map((edge) => (
+            <div
+              key={edge}
+              onPointerDown={onTrimDrag(edge)}
+              style={{ left: toPx(edge === 'start' ? keep.startMs : keep.endMs) }}
+              title={edge === 'start' ? 'Drag the in point' : 'Drag the out point'}
+              className="absolute top-6 bottom-0 z-10 -ml-1 w-2 cursor-ew-resize"
+            >
+              <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-amber-400" />
+              <span className="absolute top-0 left-1/2 h-3 w-2 -translate-x-1/2 rounded-b-sm bg-amber-400" />
+            </div>
+          ))}
 
           {/* Playhead spans every lane. */}
           <div

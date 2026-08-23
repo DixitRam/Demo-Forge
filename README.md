@@ -64,6 +64,13 @@ belongs to the viewer, not to the picture, so it does not slide or grow when
 the camera moves. **From clicks** drafts one cue per click out of the element
 text the extension already recorded; that is string formatting, not AI.
 
+**Trimming** is in and out points, nothing more: drag the amber handles, or
+press `I` / `O` at the playhead. Everything outside is shaded, playback stays
+inside it, and the export starts there. Deliberately a single kept span rather
+than a list of cuts — that keeps timeline time equal to source time, so zooms,
+captions and the cursor need no remapping at all. Cutting middles out would
+need a real edit list threaded through all of them.
+
 The timeline has a scrubbable ruler with amber marks at every logged click, a
 zoom lane, a caption lane, and a clip lane. **Ctrl+Scroll** zooms the view
 about the pointer, **Shift+Scroll** pans, and the window follows the playhead.
@@ -74,6 +81,7 @@ about the pointer, **Shift+Scroll** pans, and the window follows the playhead.
 | `Z` | add a zoom at the playhead |
 | `C` | add a caption at the playhead |
 | `S` | save the project |
+| `I` `O` | trim the start / end to the playhead |
 | `Delete` | remove the selection |
 | `Esc` | deselect |
 | `←` `→` | step one frame (hold `Shift` for a second) |
@@ -128,7 +136,10 @@ Notes for anything editing one by hand:
   defaults rather than letting `NaN` reach the renderer. It throws only on a
   missing recording or a format version it does not understand — so a
   roughly-right file loads rather than failing.
-- Omitting `zooms`, `captions` or `style` entirely is fine; they default.
+- `trim` is a single kept span, in source-video time. A span covering the
+  whole recording normalises to `null`.
+- Omitting `zooms`, `captions`, `trim` or `style` entirely is fine; they
+  default.
 
 ## The architecture contract
 

@@ -3,6 +3,7 @@ import {
   planZooms,
   type CaptionCue,
   type ProjectStyle,
+  type Trim,
   type ZoomKeyframe,
 } from '@demoforge/core';
 import { useCallback, useState } from 'react';
@@ -13,12 +14,14 @@ export function useProject() {
   const [project, setProject] = useState<LoadedProject | null>(null);
   const [keyframes, setKeyframes] = useState<ZoomKeyframe[]>([]);
   const [captions, setCaptions] = useState<CaptionCue[]>([]);
+  const [trim, setTrim] = useState<Trim | null>(null);
   const [style, setStyle] = useState<ProjectStyle>(DEFAULT_STYLE);
 
   const load = useCallback((p: LoadedProject) => {
     setProject(p);
     setKeyframes(p.zooms);
     setCaptions(p.captions);
+    setTrim(p.trim);
     setStyle(p.style);
   }, []);
 
@@ -33,7 +36,7 @@ export function useProject() {
    */
   const save = useCallback(() => {
     if (!project) return;
-    const doc = createProject(project.rec, project.mediaName, keyframes, captions, style);
+    const doc = createProject(project.rec, project.mediaName, keyframes, captions, trim, style);
     const url = URL.createObjectURL(
       new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' }),
     );
@@ -42,7 +45,7 @@ export function useProject() {
     a.download = `${project.mediaName.replace(/\.[^.]+$/, '') || 'demo'}.dfp.json`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [project, keyframes, captions, style]);
+  }, [project, keyframes, captions, trim, style]);
 
   return {
     project,
@@ -50,6 +53,8 @@ export function useProject() {
     setKeyframes,
     captions,
     setCaptions,
+    trim,
+    setTrim,
     style,
     setStyle,
     load,

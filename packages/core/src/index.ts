@@ -23,9 +23,12 @@ export type { Easing } from './easing.js';
 
 export {
   DEFAULT_STYLE,
+  MIN_TRIM_MS,
   PROJECT_FORMAT,
   PROJECT_VERSION,
+  clampTrim,
   createProject,
+  effectiveTrim,
   isProject,
   parseProject,
 } from './project.js';
@@ -36,4 +39,5 @@ export type {
   DemoProject,
   ProjectBackground,
   ProjectStyle,
+  Trim,
 } from './project.js';

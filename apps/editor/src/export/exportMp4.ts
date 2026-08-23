@@ -16,7 +16,7 @@ import coreURL from '@ffmpeg/core?url';
 import wasmURL from '@ffmpeg/core/wasm?url';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
-import type { CaptionCue, DemoRecording, ZoomKeyframe } from '@demoforge/core';
+import { effectiveTrim, type CaptionCue, type DemoRecording, type Trim, type ZoomKeyframe } from '@demoforge/core';
 import { compose } from '../render/compose.js';
 import { outputAspect, type FrameStyle } from '../render/style.js';
 
@@ -36,6 +36,7 @@ export interface ExportOptions {
   media: Blob;
   keyframes: readonly ZoomKeyframe[];
   captions: readonly CaptionCue[];
+  trim: Trim | null;
   style: FrameStyle;
   fps: number;
   onProgress: (stage: string, ratio: number) => void;
@@ -66,6 +67,18 @@ export function outputSize(
   return { w: even(w), h: even(h) };
 }
 
+/**
+ * Source-video timestamps for every frame of the export, in order.
+ *
+ * Frames are addressed in SOURCE time, not output time, which is what lets
+ * trimming stay free: zooms, captions and the cursor path are all evaluated
+ * at these timestamps with no remapping. Only the encode is offset.
+ */
+export function frameTimes(startMs: number, endMs: number, fps: number): number[] {
+  const count = Math.max(1, Math.round(((endMs - startMs) / 1000) * fps));
+  return Array.from({ length: count }, (_, i) => startMs + (i / fps) * 1000);
+}
+
 function seek(video: HTMLVideoElement, seconds: number): Promise<void> {
   return new Promise((resolve, reject) => {
     const ok = (): void => {
@@ -94,6 +107,7 @@ function toJpeg(canvas: HTMLCanvasElement): Promise<Blob> {
 
 export async function exportMp4(o: ExportOptions): Promise<Blob> {
   const { rec, video, keyframes, captions, style, fps } = o;
+  const span = effectiveTrim(o.trim, rec.video.durationMs);
   const { w, h } = outputSize(video.videoWidth, video.videoHeight, style);
 
   const canvas = document.createElement('canvas');
@@ -110,11 +124,12 @@ export async function exportMp4(o: ExportOptions): Promise<Blob> {
   const resumeAt = video.currentTime;
   video.pause();
 
-  const total = Math.max(1, Math.round((rec.video.durationMs / 1000) * fps));
+  const times = frameTimes(span.startMs, span.endMs, fps);
+  const total = times.length;
   try {
     for (let i = 0; i < total; i++) {
       if (o.signal?.aborted) throw new Error('Export cancelled.');
-      const t = (i / fps) * 1000;
+      const t = times[i]!;
       await seek(video, t / 1000);
       compose(ctx, w, h, { video, rec, keyframes, captions, t, style });
       const jpeg = await toJpeg(canvas);
@@ -131,11 +146,15 @@ export async function exportMp4(o: ExportOptions): Promise<Blob> {
     // when there is not. Audio stays a separate track muxed at the end, never
     // an input to the zoom logic — which is what lets Phase 2 swap in an AI
     // voiceover without touching any of this.
+    // -ss before -i seeks the audio input to the in-point; the frame sequence
+    // already starts there, so the two line up at output time zero.
     await ffmpeg.exec([
       '-framerate',
       String(fps),
       '-i',
       'f%06d.jpg',
+      '-ss',
+      (span.startMs / 1000).toFixed(3),
       '-i',
       'source',
       '-map',

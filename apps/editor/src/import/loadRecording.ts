@@ -7,6 +7,7 @@ import {
   type CaptionCue,
   type DemoRecording,
   type ProjectStyle,
+  type Trim,
   type ZoomKeyframe,
 } from '@demoforge/core';
 
@@ -20,6 +21,7 @@ export interface LoadedProject {
   /** Edits restored from a project file, or planned fresh from the log. */
   zooms: ZoomKeyframe[];
   captions: CaptionCue[];
+  trim: Trim | null;
   style: ProjectStyle;
   warning?: string;
 }
@@ -98,6 +100,7 @@ export async function loadBundle(files: File[]): Promise<LoadedProject> {
     mediaName: media.name,
     zooms: project ? project.zooms : planZooms(rec),
     captions: project ? project.captions : [],
+    trim: project ? project.trim : null,
     style: project ? project.style : DEFAULT_STYLE,
   };
   return warning ? { ...base, warning } : base;

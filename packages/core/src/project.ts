@@ -18,6 +18,34 @@ import type { ZoomKeyframe } from './zoom-planner.js';
 export const PROJECT_FORMAT = 'demoforge-project';
 export const PROJECT_VERSION = 1;
 
+/**
+ * In and out points, in source-video milliseconds.
+ *
+ * Deliberately a single kept span rather than a list of cuts: that keeps
+ * timeline time equal to source time everywhere except the final encode, so
+ * zooms, captions and the cursor path need no remapping at all. Cutting
+ * middles out would need a real edit list threaded through all of them.
+ */
+export interface Trim {
+  startMs: number;
+  endMs: number;
+}
+
+/** Shortest span worth keeping — below this there is nothing to scrub. */
+export const MIN_TRIM_MS = 500;
+
+/** The kept span, whether or not the project has been trimmed. */
+export function effectiveTrim(trim: Trim | null, durationMs: number): Trim {
+  return clampTrim(trim ?? { startMs: 0, endMs: durationMs }, durationMs);
+}
+
+export function clampTrim(trim: Trim, durationMs: number): Trim {
+  const limit = Math.max(durationMs, MIN_TRIM_MS);
+  const startMs = Math.min(Math.max(trim.startMs, 0), limit - MIN_TRIM_MS);
+  const endMs = Math.min(Math.max(trim.endMs, startMs + MIN_TRIM_MS), limit);
+  return { startMs, endMs };
+}
+
 export interface CaptionCue {
   tStart: number;
   tEnd: number;
@@ -76,6 +104,8 @@ export interface DemoProject {
   zooms: ZoomKeyframe[];
   /** Time-ordered. */
   captions: CaptionCue[];
+  /** null keeps the whole recording. */
+  trim: Trim | null;
   style: ProjectStyle;
 }
 
@@ -94,6 +124,7 @@ export function createProject(
   mediaName: string,
   zooms: ZoomKeyframe[] = [],
   captions: CaptionCue[] = [],
+  trim: Trim | null = null,
   style: ProjectStyle = DEFAULT_STYLE,
 ): DemoProject {
   return {
@@ -104,6 +135,7 @@ export function createProject(
     recording,
     zooms,
     captions,
+    trim: trim ? clampTrim(trim, recording.video.durationMs) : null,
     style,
   };
 }
@@ -229,6 +261,16 @@ function parseCaptions(v: unknown, durationMs: number): CaptionCue[] {
     .sort((a, b) => a.tStart - b.tStart);
 }
 
+function parseTrim(v: unknown, durationMs: number): Trim | null {
+  const t = v as Record<string, unknown> | null;
+  if (!t || typeof t !== 'object') return null;
+  const startMs = num(t.startMs, 0);
+  const endMs = num(t.endMs, durationMs);
+  const clamped = clampTrim({ startMs, endMs }, durationMs);
+  // A trim covering the whole recording is not a trim.
+  return clamped.startMs === 0 && clamped.endMs >= durationMs ? null : clamped;
+}
+
 /** Throws with a readable message rather than half-loading a broken file. */
 export function parseProject(value: unknown): DemoProject {
   const p = (value ?? {}) as Record<string, unknown>;
@@ -253,6 +295,7 @@ export function parseProject(value: unknown): DemoProject {
     recording: rec,
     zooms: parseZooms(p.zooms, durationMs),
     captions: parseCaptions(p.captions, durationMs),
+    trim: parseTrim(p.trim, durationMs),
     style: parseStyle(p.style),
   };
 }
