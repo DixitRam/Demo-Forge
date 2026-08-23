@@ -1,6 +1,6 @@
 import { DEFAULT_VOICE } from '@demoforge/core';
 import { describe, expect, it } from 'vitest';
-import { geminiPrompt, pcmFormat, readableError } from '../vite-tts.js';
+import { geminiPrompt, pcmFormat, readableError, retryAfterMs } from '../vite-tts.js';
 import { lineKey } from '../src/voice/tts.js';
 
 describe('pcmFormat', () => {
@@ -72,5 +72,17 @@ describe('readableError', () => {
   it('always says something', () => {
     expect(readableError(new Error('   '))).toBe('Speech failed.');
     expect(readableError(null)).toBe('null');
+  });
+});
+
+describe('retryAfterMs', () => {
+  it('reads the wait a quota error suggests', () => {
+    expect(retryAfterMs('Quota exceeded. Please retry in 32.610317949s.')).toBe(32_611);
+    expect(retryAfterMs('please retry in 5s')).toBe(5000);
+  });
+
+  it('is null for an error that is not worth retrying', () => {
+    expect(retryAfterMs('API key not valid.')).toBeNull();
+    expect(retryAfterMs('Please retry in a moment')).toBeNull();
   });
 });

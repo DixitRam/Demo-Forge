@@ -189,7 +189,7 @@ export default function ScriptPanel(p: Props) {
           className="rounded-lg bg-sky-500/90 py-2 font-medium text-slate-950 hover:bg-sky-400 disabled:opacity-40"
         >
           {busy
-            ? `Speaking ${p.progress!.done + 1}/${p.progress!.total}…`
+            ? (p.progress!.note ?? `Speaking ${p.progress!.done + 1}/${p.progress!.total}…`)
             : unspoken > 0
               ? `Generate voiceover (${unspoken} new)`
               : 'Regenerate voiceover'}
@@ -205,7 +205,7 @@ export default function ScriptPanel(p: Props) {
           <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] leading-relaxed text-amber-300">
             {provider.error}{' '}
             {provider.id === 'gemini'
-              ? 'Put GEMINI_API_KEY in a .env file at the repo root and restart the dev server.'
+              ? 'Put GEMINI_API_KEY in .env at the repo root (or apps/editor/.env) and restart the dev server.'
               : 'Install it (dnf install espeak-ng) and restart the dev server.'}
           </p>
         )}

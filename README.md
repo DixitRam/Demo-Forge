@@ -20,7 +20,7 @@ scripts/            make-fixture.sh — synthetic bundle with known coordinates
 
 ```sh
 pnpm install
-pnpm -r test                  # 188 tests
+pnpm -r test                  # 190 tests
 pnpm -C apps/extension build  # then load apps/extension/dist unpacked in Chrome
 pnpm -C apps/editor dev
 ```
@@ -30,8 +30,13 @@ which ones are available.
 
 - **espeak-ng (local)** — `dnf install espeak-ng`. Free, offline, robotic.
 - **Gemini AI** — copy `.env.example` to `.env` and put a key in
-  `GEMINI_API_KEY`. Sounds like a person. The key is read by the dev server
-  only and never reaches the browser.
+  `GEMINI_API_KEY`. Sounds like a person. `.env` at the repo root or in
+  `apps/editor/` both work; the key is read by the dev server only and never
+  reaches the browser.
+
+  A free-tier key allows only a few requests a minute, so generating a long
+  script pauses when the quota says to and picks up again — the button tells
+  you how long it is waiting.
 
 ## The workflow
 

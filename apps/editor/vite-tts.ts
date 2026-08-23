@@ -19,6 +19,7 @@
 
 import { spawn } from 'node:child_process';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { resolve } from 'node:path';
 import { loadEnv, type Plugin } from 'vite';
 
 const BIN = 'espeak-ng';
@@ -239,6 +240,18 @@ export function readableError(e: unknown): string {
   return msg.trim() || 'Speech failed.';
 }
 
+/**
+ * A quota error carries the wait in its own text ("Please retry in 32.6s").
+ * Handing that number back turns a dead end into a pause — a free-tier key is
+ * a few requests a minute, and a script is a few dozen lines.
+ */
+export function retryAfterMs(message: string): number | null {
+  const m = /retry in ([\d.]+)\s*s/i.exec(message);
+  if (!m) return null;
+  const seconds = Number(m[1]);
+  return Number.isFinite(seconds) ? Math.ceil(seconds * 1000) : null;
+}
+
 // --- endpoint --------------------------------------------------------------
 
 function providers(apiKey: string, espeak: boolean): ProviderInfo[] {
@@ -319,7 +332,13 @@ async function handle(
     res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
     res.end(wav);
   } catch (e) {
-    fail(500, readableError(e));
+    const message = readableError(e);
+    const wait = retryAfterMs(message);
+    if (wait === null) return fail(500, message);
+    res.statusCode = 429;
+    res.setHeader('Retry-After', String(Math.ceil(wait / 1000)));
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: message, retryAfterMs: wait }));
   }
 }
 
@@ -328,9 +347,13 @@ export function ttsPlugin(): Plugin {
   return {
     name: 'demoforge-tts',
     configResolved(config) {
-      // '' loads every variable, not just VITE_ ones — this runs on the server
-      // and the key must never be handed to the client.
-      env = loadEnv(config.mode, config.envDir ?? process.cwd(), '');
+      // Vite's env dir is this app, but in a monorepo the obvious place to put
+      // a key is the repo root — so read both, with the app's own file
+      // winning. '' loads every variable, not just VITE_ ones: this runs on
+      // the server and the key must never be handed to the client.
+      const app = config.envDir ?? config.root;
+      const repo = resolve(config.root, '..', '..');
+      env = { ...loadEnv(config.mode, repo, ''), ...loadEnv(config.mode, app, '') };
     },
     configureServer(server) {
       server.middlewares.use('/api/tts', (req, res) => void handle(req, res, env));

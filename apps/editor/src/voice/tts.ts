@@ -38,6 +38,17 @@ export async function ttsProviders(): Promise<ProviderInfo[]> {
   }
 }
 
+/** A provider asking us to slow down, with how long it wants. */
+export class RateLimited extends Error {
+  constructor(
+    message: string,
+    readonly retryAfterMs: number,
+  ) {
+    super(message);
+    this.name = 'RateLimited';
+  }
+}
+
 /** Raw speech for one line. Throws with the provider's own message. */
 export async function speak(text: string, voice: VoiceStyle): Promise<ArrayBuffer> {
   const res = await fetch(ENDPOINT, {
@@ -52,8 +63,15 @@ export async function speak(text: string, voice: VoiceStyle): Promise<ArrayBuffe
     }),
   });
   if (!res.ok) {
-    const detail = (await res.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(detail?.error ?? `Speech failed (${res.status}).`);
+    const detail = (await res.json().catch(() => null)) as {
+      error?: string;
+      retryAfterMs?: number;
+    } | null;
+    const message = detail?.error ?? `Speech failed (${res.status}).`;
+    if (res.status === 429 && detail?.retryAfterMs) {
+      throw new RateLimited(message, detail.retryAfterMs);
+    }
+    throw new Error(message);
   }
   return res.arrayBuffer();
 }

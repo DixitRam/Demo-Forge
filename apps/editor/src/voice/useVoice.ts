@@ -6,14 +6,29 @@
  * Editing a line invalidates only that line.
  */
 
-import { lineKey, mixNarration, speak, ttsProviders, type ProviderInfo } from './tts.js';
+import {
+  RateLimited,
+  lineKey,
+  mixNarration,
+  speak,
+  ttsProviders,
+  type ProviderInfo,
+} from './tts.js';
 import type { ScriptLine, VoiceStyle } from '@demoforge/core';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 export interface VoiceProgress {
   done: number;
   total: number;
+  /** What it is doing instead of speaking, if anything. */
+  note?: string;
 }
+
+/** Longer than this and waiting it out is worse than telling the user. */
+const MAX_WAIT_MS = 90_000;
+const MAX_RETRIES = 2;
+
+const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 export function useVoice(durationMs: number) {
   const [providers, setProviders] = useState<ProviderInfo[] | null>(null);
@@ -53,8 +68,29 @@ export function useVoice(durationMs: number) {
         let done = 0;
         for (const line of todo) {
           const key = lineKey(line.text, voice);
-          const buf = await audio.decodeAudioData(await speak(line.text, voice));
-          spoken.current.set(key, buf);
+          // A free-tier key is a few requests a minute and a script is a few
+          // dozen lines, so a quota knock-back is a pause, not a failure.
+          for (let attempt = 0; ; attempt++) {
+            try {
+              const buf = await audio.decodeAudioData(await speak(line.text, voice));
+              spoken.current.set(key, buf);
+              break;
+            } catch (e) {
+              if (
+                !(e instanceof RateLimited) ||
+                attempt >= MAX_RETRIES ||
+                e.retryAfterMs > MAX_WAIT_MS
+              ) {
+                throw e;
+              }
+              setProgress({
+                done,
+                total: todo.length,
+                note: `rate limited — waiting ${Math.ceil(e.retryAfterMs / 1000)}s`,
+              });
+              await wait(e.retryAfterMs + 500);
+            }
+          }
           setProgress({ done: ++done, total: todo.length });
         }
 
