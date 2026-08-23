@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>DemoForge timing check</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; font: 16px/1.4 system-ui, sans-serif; background: #0f172a; color: #e2e8f0; }
+      main { padding: 24px; display: grid; gap: 16px; grid-template-columns: repeat(3, 1fr); }
+      h1 { grid-column: 1 / -1; margin: 0; font-size: 18px; font-weight: 600; }
+      p.help { grid-column: 1 / -1; margin: 0; color: #94a3b8; font-size: 14px; }
+      button { padding: 18px; font: inherit; border: 0; border-radius: 10px; background: #334155; color: #e2e8f0; cursor: pointer; }
+      button:hover { background: #475569; }
+      #giant { grid-column: 1 / -1; min-height: 62vh; background: #1e293b; font-size: 20px; }
+      #clock { grid-column: 1 / -1; font: 700 40px ui-monospace, monospace; color: #38bdf8; }
+      #flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; transition: opacity 90ms linear; }
+      #flash.on { opacity: 1; transition: none; }
+      #log { grid-column: 1 / -1; font: 13px ui-monospace, monospace; color: #94a3b8; white-space: pre; }
+    </style>
+  </head>
+  <body>
+    <div id="flash"></div>
+    <main>
+      <h1>DemoForge timing check</h1>
+      <p class="help">
+        Record this page with the extension. Every click flashes the screen white for one
+        or two frames. Afterwards, scrub recording.webm to each flash and compare the
+        player's timestamp with the matching <code>t</code> in demo.json — they should
+        agree within ~100&nbsp;ms. The giant panel must produce <em>no</em> zoom.
+      </p>
+      <div id="clock">0.000 s</div>
+      <button id="a">Top left button</button>
+      <button id="b">Middle button</button>
+      <button id="c">Top right button</button>
+      <button id="giant">Giant panel — should NOT be zoomed (&gt;60% of the viewport)</button>
+      <div id="log"></div>
+    </main>
+    <script src="timing-check.js"></script>
+  </body>
+</html>

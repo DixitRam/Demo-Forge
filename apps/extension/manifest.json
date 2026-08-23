@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "DemoForge Recorder",
+  "version": "0.1.0",
+  "description": "Records a browser tab plus a structured click log, for the DemoForge editor.",
+  "permissions": ["tabCapture", "activeTab", "scripting", "downloads", "offscreen", "storage"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "DemoForge Recorder"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ]
+}

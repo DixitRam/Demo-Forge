@@ -1,0 +1,25 @@
+body {
+  width: 220px;
+  margin: 0;
+  padding: 14px;
+  font: 13px/1.4 system-ui, sans-serif;
+  color: #111;
+}
+h1 { margin: 0 0 10px; font-size: 14px; }
+p { margin: 0 0 8px; display: flex; align-items: center; gap: 6px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #9ca3af; }
+.dot.live { background: #dc2626; animation: pulse 1s infinite; }
+@keyframes pulse { 50% { opacity: 0.3; } }
+.count { color: #6b7280; font-size: 12px; }
+button {
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 6px;
+  background: #111;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+button:hover { background: #333; }
+.error { color: #dc2626; font-size: 12px; }

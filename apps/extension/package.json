@@ -1,0 +1,22 @@
+{
+  "name": "@demoforge/extension",
+  "version": "0.1.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@demoforge/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.2.7",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  }
+}
