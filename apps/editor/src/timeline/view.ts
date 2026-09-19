@@ -38,5 +38,8 @@ export function revealTime(view: View, durationMs: number, t: number): View {
   const span = view.end - view.start;
   const margin = span * 0.1;
   if (t >= view.start + margin && t <= view.end - margin) return view;
-  return clampView({ start: t - span / 2, end: t + span / 2 }, durationMs);
+  const next = clampView({ start: t - span / 2, end: t + span / 2 }, durationMs);
+  // Pinned against an end (always, at full width), the window cannot move.
+  // Hand back the same object, or the per-frame caller re-renders forever.
+  return next.start === view.start && next.end === view.end ? view : next;
 }

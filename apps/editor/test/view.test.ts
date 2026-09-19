@@ -62,4 +62,11 @@ describe('timeline view', () => {
     expect(after.end).toBeGreaterThan(45_000);
     expect(after.end - after.start).toBe(20_000);
   });
+
+  it('keeps the same object when the window is pinned and cannot move', () => {
+    // The player calls this every frame; a fresh-but-equal view re-renders forever.
+    const full = fullView(DUR);
+    expect(revealTime(full, DUR, 100)).toBe(full);
+    expect(revealTime(full, DUR, DUR - 100)).toBe(full);
+  });
 });
