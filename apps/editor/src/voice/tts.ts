@@ -14,6 +14,10 @@ const ENDPOINT = '/api/tts';
 export interface VoiceOption {
   id: string;
   label: string;
+  /** Set when a provider ships one person in several moods; see vite-tts.ts. */
+  speaker?: string;
+  mood?: string;
+  hint?: string;
 }
 
 export interface ProviderInfo {

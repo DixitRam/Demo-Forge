@@ -98,6 +98,9 @@ function ProviderQuota({
   );
 }
 
+const SELECT =
+  'rounded-lg border border-line bg-panel px-2 py-1.5 text-fg outline-none focus:border-blue-500';
+
 export default function ScriptPanel(p: Props) {
   const duration = p.rec.video.durationMs;
   const v = p.style.voice;
@@ -110,6 +113,7 @@ export default function ScriptPanel(p: Props) {
 
   const provider = p.providers?.find((x) => x.id === v.provider) ?? null;
   const voices = provider?.voices ?? [];
+  const current = voices.find((o) => o.id === v.voice);
 
   return (
     <div className="flex flex-col gap-5">
@@ -120,7 +124,12 @@ export default function ScriptPanel(p: Props) {
               <button
                 key={x.id}
                 onClick={() =>
-                  setV({ provider: x.id, voice: x.voices[0]?.id ?? v.voice })
+                  setV({
+                    provider: x.id,
+                    voice:
+                      (x.voices.find((o) => o.mood?.toLowerCase() === 'neutral') ?? x.voices[0])?.id ??
+                      v.voice,
+                  })
                 }
                 title={x.ok ? x.label : x.error}
                 className={`flex flex-1 items-center justify-center gap-1 rounded-md px-1 py-1.5 text-[11px] transition ${
@@ -146,21 +155,57 @@ export default function ScriptPanel(p: Props) {
         )}
         {provider?.note && <p className="text-[10px] leading-relaxed text-muted">{provider.note}</p>}
 
-        <label className="flex flex-col gap-1">
-          <span className="text-muted">Voice</span>
-          <select
-            value={v.voice}
-            onChange={(e) => setV({ voice: e.target.value })}
-            className="rounded-lg border border-line bg-panel px-2 py-1.5 text-fg outline-none focus:border-blue-500"
-          >
-            {voices.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.label}
-              </option>
-            ))}
-            {!voices.some((o) => o.id === v.voice) && <option value={v.voice}>{v.voice}</option>}
-          </select>
-        </label>
+        {current?.speaker ? (
+          <>
+            <label className="flex flex-col gap-1">
+              <span className="text-muted">Voice</span>
+              <select
+                value={current.speaker}
+                onChange={(e) => {
+                  // Keep the mood when the new speaker has it, else fall back to neutral.
+                  const theirs = voices.filter((o) => o.speaker === e.target.value);
+                  const next =
+                    theirs.find((o) => o.mood === current.mood) ??
+                    theirs.find((o) => o.mood?.toLowerCase() === 'neutral') ??
+                    theirs[0];
+                  if (next) setV({ voice: next.id });
+                }}
+                className={SELECT}
+              >
+                {[...new Set(voices.map((o) => o.speaker))].map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-muted">Mood</span>
+              <select value={v.voice} onChange={(e) => setV({ voice: e.target.value })} className={SELECT}>
+                {voices
+                  .filter((o) => o.speaker === current.speaker)
+                  .map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.mood ?? 'Default'}
+                      {o.hint ? ` — ${o.hint}` : ''}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          </>
+        ) : (
+          <label className="flex flex-col gap-1">
+            <span className="text-muted">Voice</span>
+            <select value={v.voice} onChange={(e) => setV({ voice: e.target.value })} className={SELECT}>
+              {voices.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+              {!current && <option value={v.voice}>{v.voice}</option>}
+            </select>
+          </label>
+        )}
 
         {provider?.rate !== false && (
           <Slider

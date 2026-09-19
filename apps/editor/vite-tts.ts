@@ -60,6 +60,12 @@ const MAX_BODY = 64 * 1024;
 export interface VoiceOption {
   id: string;
   label: string;
+  /** Who is speaking, when a provider ships one person in several moods. */
+  speaker?: string;
+  /** That person's delivery for this id — "Confident", "Sad". */
+  mood?: string;
+  /** What the mood sounds like, in the provider's words. */
+  hint?: string;
 }
 
 /** Voices that ship with every espeak-ng install, so the list is never a lie. */
@@ -362,18 +368,25 @@ async function mistralVoices(apiKey: string): Promise<VoiceOption[]> {
     headers: { Authorization: `Bearer ${apiKey}` },
   });
   if (!res.ok) throw new Error(await mistralError(res));
-  const body = (await res.json()) as {
-    items?: Array<{ id?: string; name?: string; languages?: string[]; gender?: string | null }>;
-  };
+  type Item = { id: string; name?: string; languages?: string[]; gender?: string | null; tags?: string[] };
+  const body = (await res.json()) as { items?: Array<Partial<Item>> };
   return (body.items ?? [])
-    .filter((v): v is { id: string; name?: string; languages?: string[]; gender?: string | null } =>
-      typeof v.id === 'string' && MISTRAL_VOICE_RE.test(v.id),
-    )
+    .filter((v): v is Item => typeof v.id === 'string' && MISTRAL_VOICE_RE.test(v.id))
     .map((v) => {
       const traits = [v.gender, v.languages?.slice(0, 3).join('/')].filter(Boolean).join(', ');
       const name = v.name ?? v.id;
-      return { id: v.id, label: traits ? `${name} · ${traits}` : name };
-    });
+      // Presets are one person per mood, named "Paul - Confident". A cloned
+      // voice has no mood and is its own speaker.
+      const [person, mood] = name.split(/\s+-\s+/, 2);
+      return {
+        id: v.id,
+        label: traits ? `${name} · ${traits}` : name,
+        speaker: traits ? `${person} · ${traits}` : person!,
+        ...(mood ? { mood } : {}),
+        ...(v.tags?.length ? { hint: v.tags.join(', ') } : {}),
+      };
+    })
+    .sort((a, b) => a.speaker.localeCompare(b.speaker) || (a.mood ?? '').localeCompare(b.mood ?? ''));
 }
 
 async function speakMistral(
