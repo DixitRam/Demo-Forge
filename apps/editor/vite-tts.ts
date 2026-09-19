@@ -22,6 +22,7 @@
 import { spawn } from 'node:child_process';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { resolve } from 'node:path';
+import { GoogleGenAI } from '@google/genai';
 import { loadEnv, type Plugin } from 'vite';
 
 const BIN = 'espeak-ng';
@@ -217,7 +218,6 @@ async function speakGemini(
   apiKey: string,
   model: string,
 ): Promise<Buffer> {
-  const { GoogleGenAI } = await import('@google/genai');
   const ai = new GoogleGenAI({ apiKey });
 
   const stream = await ai.models.generateContentStream({

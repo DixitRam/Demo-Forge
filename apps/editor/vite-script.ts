@@ -21,6 +21,7 @@
 import { fitToBudget } from '@demoforge/core';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { resolve } from 'node:path';
+import { GoogleGenAI } from '@google/genai';
 import { loadEnv, type Plugin } from 'vite';
 
 /** An alias, so this tracks Google's current flash model instead of pinning. */
@@ -144,7 +145,6 @@ async function write(
   apiKey: string,
   model: string,
 ): Promise<Array<{ step: number; text: string }>> {
-  const { GoogleGenAI } = await import('@google/genai');
   const ai = new GoogleGenAI({ apiKey });
 
   const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
