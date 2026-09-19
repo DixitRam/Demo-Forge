@@ -18,18 +18,40 @@ describe('cursorAt', () => {
     expect(cursorAt(SAMPLE, 9000).xNorm).toBeCloseTo(0.05, 6);
   });
 
-  it('dwells at the previous point instead of drifting the whole gap', () => {
-    // 5s gap between t=1000 and t=6000; at t=3000 (well before departure) it is parked.
-    // Note: t=3000/3150 are themselves clicks, so check the 9000->12000 gap.
+  it('dwells near the previous point instead of travelling the whole gap', () => {
+    // Check the 9000->12000 gap: parked, with only a few pixels of idle drift.
     const parked = cursorAt(SAMPLE, 10000);
-    expect(parked.xNorm).toBeCloseTo(0.05, 6);
-    expect(parked.yNorm).toBeCloseTo(0.95, 6);
+    expect(Math.abs(parked.xNorm - 0.05)).toBeLessThan(0.006);
+    expect(Math.abs(parked.yNorm - 0.95)).toBeLessThan(0.006);
   });
 
-  it('travels over moveMs into the next click', () => {
+  it('drifts while parked instead of freezing', () => {
+    const a = cursorAt(SAMPLE, 10000);
+    const b = cursorAt(SAMPLE, 10500);
+    expect(Math.hypot(a.xNorm - b.xNorm, a.yNorm - b.yNorm)).toBeGreaterThan(0.0002);
+  });
+
+  it('travels on an arc, not a straight line', () => {
+    // Midway from (0.05,0.95) to (0.88,y) the point sits off the chord.
+    const from = cursorAt(SAMPLE, 11000);
+    const to = cursorAt(SAMPLE, 12000);
+    const mid = cursorAt(SAMPLE, 12000 - 250);
+    const cross = (to.xNorm - from.xNorm) * (mid.yNorm - from.yNorm) - (to.yNorm - from.yNorm) * (mid.xNorm - from.xNorm);
+    expect(Math.abs(cross)).toBeGreaterThan(0.001);
+  });
+
+  it('visits hover moves without a click pulse', () => {
+    const rec = { ...SAMPLE, events: [...SAMPLE.events, { t: 7500, type: 'move' as const, xNorm: 0.7, yNorm: 0.2 }] };
+    const s = cursorAt(rec, 7500);
+    expect(s.xNorm).toBeCloseTo(0.7, 6);
+    expect(s.yNorm).toBeCloseTo(0.2, 6);
+    expect(s.clickPulse).toBe(0);
+  });
+
+  it('travels into the next click, overshooting at most slightly', () => {
     const mid = cursorAt(SAMPLE, 12000 - C.moveMs / 2);
     expect(mid.xNorm).toBeGreaterThan(0.05);
-    expect(mid.xNorm).toBeLessThan(0.88);
+    expect(mid.xNorm).toBeLessThan(0.88 + 0.02);
   });
 
   it('moves smoothly with no jumps', () => {
@@ -49,6 +71,6 @@ describe('cursorAt', () => {
   });
 
   it('holds on the last click after the final event', () => {
-    expect(cursorAt(SAMPLE, 14999).xNorm).toBeCloseTo(0.88, 6);
+    expect(Math.abs(cursorAt(SAMPLE, 14999).xNorm - 0.88)).toBeLessThan(0.006);
   });
 });

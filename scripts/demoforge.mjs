@@ -340,7 +340,28 @@ async function act(page, step, log) {
   } else if ('press' in step) {
     await page.keyboard.press(step.press);
   } else if ('hover' in step) {
-    await page.locator(step.hover).hover();
+    await (await at(page.locator(step.hover), 'move')).hover();
+  } else if ('circle' in step) {
+    // Loop the pointer around an element to draw the eye, the way a presenter
+    // does. Logged as moves; the editor's cursor glides through them.
+    const loc = page.locator(step.circle);
+    await loc.scrollIntoViewIfNeeded();
+    const box = await loc.boundingBox();
+    if (!box) throw new Error('element has no box (hidden?)');
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const rx = Math.min(box.width / 2 + 14, 160);
+    const ry = Math.min(box.height / 2 + 10, 90);
+    const n = 16;
+    const ms = step.ms ?? 1400;
+    for (let k = 0; k <= n; k++) {
+      const a = Math.PI / 2 + (2 * Math.PI * k) / n;
+      const x = cx + rx * Math.cos(a);
+      const y = cy + ry * Math.sin(a);
+      await page.mouse.move(x, y);
+      log({ type: 'move', xNorm: x / vp.width, yNorm: y / vp.height });
+      if (k < n) await page.waitForTimeout(ms / n);
+    }
   } else if ('scroll' in step) {
     if (typeof step.scroll === 'number') await page.mouse.wheel(0, step.scroll);
     else await page.locator(step.scroll).scrollIntoViewIfNeeded();

@@ -19,7 +19,7 @@ export interface DemoElement {
 
 export interface DemoEvent {
   t: number; // ms since recording start (t0 = MediaRecorder.start())
-  type: 'click' | 'input' | 'scroll' | 'nav';
+  type: 'click' | 'input' | 'scroll' | 'nav' | 'move'; // move: cursor-only waypoint (hover, attention circle)
   xNorm: number; // 0..1  (clientX / innerWidth)
   yNorm: number; // 0..1  (clientY / innerHeight)
   el?: DemoElement;
