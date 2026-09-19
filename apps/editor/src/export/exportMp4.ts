@@ -1,10 +1,7 @@
 /**
- * MP4 export via ffmpeg.wasm.
- *
- * TODO: server-side ffmpeg render. Encoding in wasm is the fastest way to a
- * working export with no backend, but it is single-threaded-slow and capped by
- * browser memory. Moving this to a server buys real speed, higher quality
- * presets, and (Phase 2) muxing an AI voiceover track.
+ * MP4 export via ffmpeg.wasm — the fallback. When the dev server is running,
+ * the Export dialog uses native ffmpeg instead (vite-export.ts, ~4x faster);
+ * this path is for a static build with no server.
  *
  * We render offline — seek, compose, encode, repeat — rather than recording
  * canvas.captureStream() in real time. It is slower but frame-exact: a
@@ -17,9 +14,6 @@ import wasmURL from '@ffmpeg/core/wasm?url';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
 import {
-  editedDuration,
-  editedToSource,
-  keptSegments,
   type CaptionCue,
   type CutRegion,
   type DemoRecording,
@@ -27,10 +21,8 @@ import {
   type ZoomKeyframe,
 } from '@demoforge/core';
 import { compose } from '../render/compose.js';
-import { outputAspect, type FrameStyle } from '../render/style.js';
-
-/** Cap the long edge; a 4K screen recording is not worth a 4K wasm encode. */
-const MAX_LONG_EDGE = 1920;
+import type { FrameStyle } from '../render/style.js';
+import { frameTimes, mixFilter, outputSize } from './plan.js';
 
 // ponytail: every frame is held as a JPEG in the wasm filesystem until the
 // encode runs, so peak memory is roughly frames x frame size — fine for a
@@ -53,111 +45,6 @@ export interface ExportOptions {
   fps: number;
   onProgress: (stage: string, ratio: number) => void;
   signal?: AbortSignal;
-}
-
-/**
- * Size the output frame for the chosen aspect, keeping the recording at its
- * native resolution inside it (so a 9:16 frame around a 16:9 capture adds
- * background rather than throwing away pixels), then cap the long edge.
- */
-export function outputSize(
-  videoW: number,
-  videoH: number,
-  style: FrameStyle,
-): { w: number; h: number } {
-  const aspect = outputAspect(style, videoW, videoH);
-  const videoAspect = videoW / (videoH || 1);
-  let w = aspect >= videoAspect ? videoH * aspect : videoW;
-  let h = aspect >= videoAspect ? videoH : videoW / aspect;
-
-  const scale = Math.min(1, MAX_LONG_EDGE / Math.max(w, h));
-  w *= scale;
-  h *= scale;
-
-  // H.264 needs even dimensions.
-  const even = (n: number): number => Math.max(2, Math.round(n / 2) * 2);
-  return { w: even(w), h: even(h) };
-}
-
-/**
- * Source-video timestamps for every frame of the export, in order.
- *
- * We walk EDITED time — the demo as the viewer sees it — and map each frame
- * back to source time through the edit list. Everything else (zooms,
- * captions, the cursor path) is then evaluated at a source timestamp with no
- * remapping of its own, which is what keeps cutting cheap.
- */
-export function frameTimes(
-  cuts: readonly CutRegion[],
-  durationMs: number,
-  fps: number,
-): number[] {
-  const total = editedDuration(cuts, durationMs);
-  const count = Math.max(1, Math.round((total / 1000) * fps));
-  return Array.from({ length: count }, (_, i) =>
-    editedToSource(cuts, durationMs, (i / fps) * 1000),
-  );
-}
-
-/**
- * Splice one input's audio to match the cuts: trim each kept run out of it and
- * concat them. Returns null when there is nothing to splice.
- *
- * Doing this as a filter graph rather than decoding and re-splicing in the
- * browser keeps the whole audio path inside ffmpeg, where it is already going.
- * The narration mixdown is in source time for exactly this reason — it goes
- * through the identical filter, with no idea that cuts exist.
- */
-export function audioFilter(
-  cuts: readonly CutRegion[],
-  durationMs: number,
-  input = 1,
-  label = 'aout',
-  volume?: number,
-): string | null {
-  const segs = keptSegments(cuts, durationMs);
-  if (segs.length === 0) return null;
-  const tag = (i: number): string => `x${input}_${i}`;
-  const parts = segs.map(
-    (s, i) =>
-      `[${input}:a]atrim=${(s.start / 1000).toFixed(3)}:${(s.end / 1000).toFixed(3)},` +
-      `asetpts=N/SR/TB[${tag(i)}]`,
-  );
-  const inputs = segs.map((_, i) => `[${tag(i)}]`).join('');
-  const joined = `${inputs}concat=n=${segs.length}:v=0:a=1`;
-  return volume === undefined
-    ? `${parts.join(';')};${joined}[${label}]`
-    : `${parts.join(';')};${joined}[${label}_raw];[${label}_raw]volume=${volume.toFixed(3)}[${label}]`;
-}
-
-/**
- * The full audio graph: the captured tab audio, the narration, or both mixed
- * with the recording ducked underneath the voice.
- *
- * ponytail: a constant duck, not a sidechain compressor. It is one number and
- * it is right for a demo where the tab audio is ambience; swap in
- * `sidechaincompress` if the recording ever carries something worth hearing.
- */
-export function mixFilter(
-  cuts: readonly CutRegion[],
-  durationMs: number,
-  opts: { tabAudio: boolean; narration: boolean; duck: number; gain: number },
-): string | null {
-  const src = opts.tabAudio
-    ? audioFilter(cuts, durationMs, 1, 'aorig', opts.narration ? opts.duck : undefined)
-    : null;
-  // The mixdown is at unity, so the voice level is applied here — the same
-  // number the preview hands to the audio element.
-  const nar = opts.narration ? audioFilter(cuts, durationMs, 2, 'anarr', opts.gain) : null;
-
-  if (src && nar) {
-    return (
-      `${src};${nar};[aorig][anarr]` +
-      `amix=inputs=2:normalize=0:duration=longest:dropout_transition=0[aout]`
-    );
-  }
-  if (nar) return nar.replace(/\[anarr\]$/, '[aout]');
-  return src?.replace(/\[aorig\]$/, '[aout]') ?? null;
 }
 
 /** Shared with the script writer, which seeks the same way to grab frames. */
@@ -187,6 +74,13 @@ function toJpeg(canvas: HTMLCanvasElement): Promise<Blob> {
   });
 }
 
+/**
+ * True while frames are being rendered. The preview player shares the video
+ * element and stands down while it is set: redrawing and re-rendering the
+ * editor on every seek made each exported frame ~10x slower.
+ */
+export let exporting = false;
+
 export async function exportMp4(o: ExportOptions): Promise<Blob> {
   const { rec, video, keyframes, captions, cuts, style, fps } = o;
   const { w, h } = outputSize(video.videoWidth, video.videoHeight, style);
@@ -204,6 +98,7 @@ export async function exportMp4(o: ExportOptions): Promise<Blob> {
   const wasPaused = video.paused;
   const resumeAt = video.currentTime;
   video.pause();
+  exporting = true;
 
   const times = frameTimes(cuts, rec.video.durationMs, fps);
   const total = times.length;
@@ -301,6 +196,7 @@ export async function exportMp4(o: ExportOptions): Promise<Blob> {
     o.onProgress('Done', 1);
     return new Blob([data as Uint8Array<ArrayBuffer>], { type: 'video/mp4' });
   } finally {
+    exporting = false;
     // Free the wasm heap whether we finished or bailed out.
     ffmpeg.terminate();
     video.currentTime = resumeAt;

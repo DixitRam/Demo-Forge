@@ -9,7 +9,7 @@ import {
   type DemoRecording,
 } from '@demoforge/core';
 import { describe, expect, it } from 'vitest';
-import { audioFilter, frameTimes, mixFilter } from '../src/export/exportMp4.js';
+import { audioFilter, frameTimes, mixFilter } from '../src/export/plan.js';
 
 const DUR = 14_000;
 

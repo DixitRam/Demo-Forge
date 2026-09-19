@@ -1,6 +1,7 @@
 import { skipTarget, type CaptionCue, type CutRegion, type ZoomKeyframe } from '@demoforge/core';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { LoadedProject } from '../import/loadRecording.js';
+import { exporting } from '../export/exportMp4.js';
 import { compose } from '../render/compose.js';
 import { outputAspect, type FrameStyle } from '../render/style.js';
 
@@ -35,6 +36,10 @@ export default function Player({ project, keyframes, captions, cuts, style, onTi
 
     let frame = 0;
     const draw = (): void => {
+      if (exporting) {
+        frame = requestAnimationFrame(draw);
+        return;
+      }
       const cur = latest.current;
 
       // Playback jumps over cut regions. Done here rather than on 'timeupdate'

@@ -30,6 +30,12 @@ export interface ComposeOptions {
   /** Playhead in ms, on the same clock as DemoEvent.t. */
   t: number;
   style: FrameStyle;
+  /**
+   * Background and drop shadow already painted at this size. They depend on
+   * neither the playhead nor the zoom, so a renderer drawing thousands of
+   * frames paints them once (see backdrop()) instead of every frame.
+   */
+  backdrop?: CanvasImageSource;
 }
 
 export function compose(
@@ -38,7 +44,8 @@ export function compose(
   h: number,
   o: ComposeOptions,
 ): Stage | null {
-  drawBackground(ctx, w, h, o.style);
+  if (o.backdrop) ctx.drawImage(o.backdrop, 0, 0, w, h);
+  else drawBackground(ctx, w, h, o.style);
 
   const vw = o.video.videoWidth;
   const vh = o.video.videoHeight;
@@ -52,7 +59,7 @@ export function compose(
   // Drop shadow: a filled rounded rect behind the frame. Painted separately so
   // the shadow is not re-applied to every overlay drawn inside the clip.
   const sh = o.style.shadow;
-  if (sh.alpha > 0 && (sh.blur > 0 || sh.y > 0)) {
+  if (!o.backdrop && sh.alpha > 0 && (sh.blur > 0 || sh.y > 0)) {
     ctx.save();
     ctx.shadowColor = `rgba(0, 0, 0, ${sh.alpha})`;
     ctx.shadowBlur = sh.blur * u;
@@ -95,4 +102,25 @@ export function compose(
   if (cue) drawCaption(ctx, stage, h, cue, o.style.captions);
 
   return stage;
+}
+
+/**
+ * Paint what every frame shares — background and drop shadow — for use as
+ * `backdrop`. The frame area is left as the shadow's black fill, which the
+ * video covers exactly, since it is drawn through the same rounded clip.
+ */
+export function backdrop(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  o: Pick<ComposeOptions, 'video' | 'rec' | 'style'>,
+): void {
+  const still = { videoWidth: o.video.videoWidth, videoHeight: o.video.videoHeight, readyState: 0 };
+  compose(ctx, w, h, {
+    video: still as HTMLVideoElement,
+    rec: o.rec,
+    keyframes: [],
+    t: 0,
+    style: { ...o.style, cursor: { ...o.style.cursor, show: false } },
+  });
 }

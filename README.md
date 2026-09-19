@@ -52,7 +52,32 @@ which ones are available.
    `recording.webm` and `demo.json` (a `DemoRecording`).
 3. **Edit.** Drop both into the editor. Zooms are planned from the click log;
    drag the pills to move or resize them, add and delete, restyle the frame.
-4. **Export.** Render to MP4 in the browser via ffmpeg.wasm.
+4. **Export.** Render to MP4. With the dev server running this uses native
+   ffmpeg (`apps/editor/vite-export.ts`): the recording is decoded straight
+   through, each frame drawn by the editor's own `compose()` on a Skia canvas,
+   and piped into x264 — an 86 s demo in about 2 minutes. Without a server it
+   falls back to ffmpeg.wasm in the browser, several times slower.
+
+## Agent-recorded demos
+
+Tell Claude Code "record a demo of /login" and it does the rest. The
+`demoforge` skill (`.claude/skills/demoforge/`, symlink it into
+`~/.claude/skills/` to use it from any repo) has the agent read the page,
+write `demos/<name>/flow.json` — Playwright actions with a `say` line of
+narration on each — and run:
+
+```sh
+node scripts/demoforge.mjs record demos/<name>/flow.json   # video + demo.json + project with script
+node scripts/demoforge.mjs steps  demos/<name>             # frames the agent checks
+node scripts/demoforge.mjs open   demos/<name>             # editor at ?demo=<name>
+```
+
+The recorder paces itself to the narration: each line starts a beat before
+its action and the step holds until the line has been said. `setup` steps
+(signing in) run off camera. Capture is 2× device pixels, encoded as VP9 from the
+screencast's own frames — Playwright's built-in recorder is capped at 1 Mbps. `${NAME}` in a flow is read from the environment
+or `.env`, so credentials stay out of the file. The flow is the only file in a
+take that is committed — re-recording after a UI change is the same command.
 
 ## Editor
 
@@ -305,8 +330,9 @@ For recording-side timing, see `apps/extension/README.md`.
 - **Velocity continuity at zoom seams.** Chained zooms are position-continuous,
   but the ease curve's velocity still steps at a ramp boundary, which can read
   as a small jerk. A spring chasing the eased target is the fix if it shows.
-- **ffmpeg.wasm export** holds every frame in memory until the encode runs.
-  Fine for a 30 s demo; a server-side render is the upgrade path.
+- **Native export is one process, one frame at a time** (~1.5x real time at
+  2880x1800). Splitting the timeline across worker threads is the next step
+  if that matters. The ffmpeg.wasm fallback still holds every frame in memory.
 - **Pill handles** stay inside the pill, so a very short zoom is fiddly to grab.
 - **Voice providers are dev-server only**, so a statically built editor has
   none. Fine while this is a tool you run with `pnpm dev`; the fix is the same

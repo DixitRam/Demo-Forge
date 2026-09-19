@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { loadBundle, type LoadedProject } from './loadRecording.js';
 
 export default function DropZone({ onLoad }: { onLoad: (p: LoadedProject) => void }) {
@@ -20,6 +20,29 @@ export default function DropZone({ onLoad }: { onLoad: (p: LoadedProject) => voi
     },
     [onLoad],
   );
+
+  // `?demo=<name>` opens a take `demoforge record` left in demos/<name>/.
+  useEffect(() => {
+    const name = new URLSearchParams(location.search).get('demo');
+    if (!name) return;
+    const base = `/api/demo/${encodeURIComponent(name)}`;
+    let live = true; // StrictMode mounts twice; only the surviving mount loads
+    void (async () => {
+      const res = await fetch(base);
+      if (!res.ok) return setError(`No recorded demo called "${name}".`);
+      // A raw demo.json would shadow the project that holds the script.
+      const names = (await res.json() as string[]).filter((n, _, all) =>
+        n === 'demo.json' ? !all.includes('demo.dfp.json') : true,
+      );
+      const files = await Promise.all(
+        names.map(async (n) => new File([await (await fetch(`${base}/${n}`)).blob()], n)),
+      );
+      if (live) await accept(files);
+    })();
+    return () => {
+      live = false;
+    };
+  }, [accept]);
 
   return (
     <div className="flex h-full items-center justify-center p-8">

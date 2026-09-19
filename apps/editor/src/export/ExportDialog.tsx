@@ -1,9 +1,10 @@
 import { editedDuration, type CaptionCue, type CutRegion, type ZoomKeyframe } from '@demoforge/core';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { IconExport } from '../panels/icons.js';
 import type { LoadedProject } from '../import/loadRecording.js';
 import type { FrameStyle } from '../render/style.js';
 import { exportMp4 } from './exportMp4.js';
+import { serverExport, serverExportAvailable } from './serverExport.js';
 
 const FPS_CHOICES = [24, 30, 60];
 
@@ -32,15 +33,21 @@ export default function ExportDialog({
   const [error, setError] = useState<string | null>(null);
   const [url, setUrl] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
+  // Native ffmpeg on the dev server when it is there; the browser otherwise.
+  const [native, setNative] = useState<boolean | null>(null);
+  const [engine, setEngine] = useState<'native' | 'browser'>('native');
+  useEffect(() => {
+    if (open && native === null) void serverExportAvailable().then(setNative);
+  }, [open, native]);
+  const useNative = native === true && engine === 'native';
 
   const run = async (): Promise<void> => {
     setError(null);
     setUrl(null);
     abort.current = new AbortController();
     try {
-      const blob = await exportMp4({
+      const opts = {
         rec: project.rec,
-        video: project.video,
         media: project.media,
         narration,
         voice: style.voice,
@@ -50,11 +57,12 @@ export default function ExportDialog({
         style,
         fps,
         signal: abort.current.signal,
-        onProgress: (s, r) => {
+        onProgress: (s: string, r: number) => {
           setStage(s);
           setRatio(r);
         },
-      });
+      };
+      const blob = useNative ? await serverExport(opts) : await exportMp4({ ...opts, video: project.video });
       setUrl(URL.createObjectURL(blob));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -97,6 +105,21 @@ export default function ExportDialog({
           ))}
         </select>
       </label>
+
+      {native && (
+        <label className="flex items-center justify-between gap-3">
+          <span className="text-muted">Render with</span>
+          <select
+            value={engine}
+            disabled={busy}
+            onChange={(e) => setEngine(e.target.value as 'native' | 'browser')}
+            className="rounded-md bg-raised px-2 py-1 text-fg"
+          >
+            <option value="native">ffmpeg on this machine (fast)</option>
+            <option value="browser">the browser (slow)</option>
+          </select>
+        </label>
+      )}
 
       {busy && (
         <span className="flex items-center gap-2 text-muted">

@@ -7,3 +7,8 @@ dist/
 .env
 .env.*
 !.env.example
+
+# Recorded takes: keep the flow, regenerate the rest.
+demos/*/*
+!demos/*/flow.json
+demos/.editor.log

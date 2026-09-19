@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { outputSize } from '../src/export/exportMp4.js';
+import { outputSize } from '../src/export/plan.js';
 import { DEFAULT_STYLE, type FrameStyle } from '../src/render/style.js';
 
 const withAspect = (aspect: number | null): FrameStyle => ({ ...DEFAULT_STYLE, aspect });
