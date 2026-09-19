@@ -19,6 +19,13 @@ import type { WriterStatus } from '../voice/writeScript.js';
 import { Section, Slider } from './controls.js';
 
 /** Starting points for a director's note; it is free text, not a menu. */
+/** The .env name to set for each hosted provider. */
+const KEY_NAMES: Record<string, string> = {
+  gemini: 'GEMINI_API_KEY',
+  elevenlabs: 'ELEVENLABS_API_KEY',
+  mistral: 'MISTRAL_API_KEY',
+};
+
 const DIRECTIONS: string[] = [
   'A clear, friendly product walkthrough narrator. Measured pace, warm and articulate.',
   'An authoritative corporate trainer. Newscaster style, deliberate pauses.',
@@ -108,7 +115,7 @@ export default function ScriptPanel(p: Props) {
     <div className="flex flex-col gap-5">
       <Section label="Voice">
         {p.providers && (
-          <div className="flex flex-wrap gap-1 rounded-lg bg-panel p-1">
+          <div className="flex gap-1 rounded-lg bg-raised p-1">
             {p.providers.map((x) => (
               <button
                 key={x.id}
@@ -116,14 +123,14 @@ export default function ScriptPanel(p: Props) {
                   setV({ provider: x.id, voice: x.voices[0]?.id ?? v.voice })
                 }
                 title={x.ok ? x.label : x.error}
-                className={`min-w-[30%] flex-1 rounded-md px-2 py-1 text-[10px] transition ${
+                className={`flex flex-1 items-center justify-center gap-1 rounded-md px-1 py-1.5 text-[11px] transition ${
                   v.provider === x.id
-                    ? 'bg-blue-600 font-medium text-white'
+                    ? 'bg-blue-600 font-medium text-white shadow-sm'
                     : 'text-muted hover:text-fg'
-                } ${x.ok ? '' : 'opacity-60'}`}
+                }`}
               >
                 {x.label}
-                {!x.ok && ' ·  ⚠'}
+                {!x.ok && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />}
               </button>
             ))}
           </div>
@@ -291,9 +298,7 @@ export default function ScriptPanel(p: Props) {
             {provider.error}{' '}
             {provider.id === 'local'
               ? 'Install it (dnf install espeak-ng) and restart the dev server.'
-              : `Put ${
-                  provider.id === 'gemini' ? 'GEMINI_API_KEY' : 'ELEVENLABS_API_KEY'
-                } in .env at the repo root (or apps/editor/.env) and restart the dev server.`}
+              : `Put ${KEY_NAMES[provider.id]} in .env at the repo root (or apps/editor/.env) and restart the dev server.`}
           </p>
         )}
         {p.error && (

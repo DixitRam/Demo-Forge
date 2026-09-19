@@ -13,6 +13,8 @@
  * and takes a director's note instead of a words-per-minute dial.
  * `elevenlabs` needs ELEVENLABS_API_KEY, has the best voices, and is metered
  * per character — so it reports what is left of the allowance.
+ * `mistral` is Voxtral TTS: needs MISTRAL_API_KEY, preset voices plus any the
+ * account has cloned.
  *
  * ponytail: dev-server only, so a built editor has no voice provider. Fine
  * while this is a self-hosted tool you run with `pnpm dev`; the fix is the
@@ -28,6 +30,10 @@ import { loadEnv, type Plugin } from 'vite';
 const BIN = 'espeak-ng';
 const DEFAULT_GEMINI_MODEL = 'gemini-3.1-flash-tts-preview';
 const ELEVEN_API = 'https://api.elevenlabs.io/v1';
+const MISTRAL_API = 'https://api.mistral.ai/v1';
+const DEFAULT_MISTRAL_MODEL = 'voxtral-mini-tts-2603';
+/** Mistral voice ids are UUIDs or slugs. */
+const MISTRAL_VOICE_RE = /^[A-Za-z0-9_-]{1,64}$/;
 /**
  * Multilingual v2 is 1 credit per character. `eleven_flash_v2_5` is half that
  * and noticeably less good — set ELEVENLABS_MODEL if the allowance matters
@@ -88,7 +94,7 @@ export interface Quota {
 }
 
 export interface ProviderInfo {
-  id: 'local' | 'gemini' | 'elevenlabs';
+  id: 'local' | 'gemini' | 'elevenlabs' | 'mistral';
   label: string;
   ok: boolean;
   error?: string;
@@ -335,6 +341,83 @@ async function speakEleven(
   return Buffer.concat([wavHeader(pcm.length, 1, 24_000, 16), pcm]);
 }
 
+// --- mistral ---------------------------------------------------------------
+
+/** Mistral errors come as `{message}`, `{detail}`, or FastAPI's `{detail: [{msg}]}`. */
+export async function mistralError(res: Response): Promise<string> {
+  const body = (await res.json().catch(() => null)) as {
+    message?: unknown;
+    detail?: unknown;
+  } | null;
+  if (typeof body?.message === 'string') return body.message;
+  if (typeof body?.detail === 'string') return body.detail;
+  const first = Array.isArray(body?.detail) ? (body.detail[0] as { msg?: unknown }) : undefined;
+  if (typeof first?.msg === 'string') return first.msg;
+  return `Mistral returned ${res.status}.`;
+}
+
+/** Presets and the account's cloned voices, live — same reasoning as ElevenLabs. */
+async function mistralVoices(apiKey: string): Promise<VoiceOption[]> {
+  const res = await fetch(`${MISTRAL_API}/audio/voices?limit=100`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  if (!res.ok) throw new Error(await mistralError(res));
+  const body = (await res.json()) as {
+    items?: Array<{ id?: string; name?: string; languages?: string[]; gender?: string | null }>;
+  };
+  return (body.items ?? [])
+    .filter((v): v is { id: string; name?: string; languages?: string[]; gender?: string | null } =>
+      typeof v.id === 'string' && MISTRAL_VOICE_RE.test(v.id),
+    )
+    .map((v) => {
+      const traits = [v.gender, v.languages?.slice(0, 3).join('/')].filter(Boolean).join(', ');
+      const name = v.name ?? v.id;
+      return { id: v.id, label: traits ? `${name} · ${traits}` : name };
+    });
+}
+
+async function speakMistral(
+  text: string,
+  voice: string,
+  apiKey: string,
+  model: string,
+): Promise<Buffer> {
+  const res = await fetch(`${MISTRAL_API}/audio/speech`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, input: text, voice_id: voice, response_format: 'wav' }),
+  });
+  if (!res.ok) throw new Error(await mistralError(res));
+
+  const body = (await res.json()) as { audio_data?: unknown };
+  if (typeof body.audio_data !== 'string' || body.audio_data === '') {
+    throw new Error('Mistral returned no audio for that line.');
+  }
+  const wav = Buffer.from(body.audio_data, 'base64');
+  if (wav.toString('latin1', 0, 4) !== 'RIFF') throw new Error('Mistral did not return a WAV file.');
+  // A streamed WAV can carry placeholder sizes; patching is a no-op otherwise.
+  return fixWavLengths(wav);
+}
+
+async function mistralProvider(apiKey: string): Promise<ProviderInfo> {
+  const base: ProviderInfo = {
+    id: 'mistral',
+    label: 'Mistral',
+    ok: false,
+    voices: [],
+    rate: false,
+    direction: false,
+  };
+  if (!apiKey) return { ...base, error: 'MISTRAL_API_KEY is not set for the dev server.' };
+  try {
+    const voices = await mistralVoices(apiKey);
+    if (voices.length === 0) return { ...base, error: 'This Mistral account lists no voices.' };
+    return { ...base, ok: true, voices };
+  } catch (e) {
+    return { ...base, error: e instanceof Error ? e.message : 'Mistral is unreachable.' };
+  }
+}
+
 /**
  * A quota error carries the wait in its own text ("Please retry in 32.6s").
  * Handing that number back turns a dead end into a pause — a free-tier key is
@@ -379,7 +462,7 @@ async function providers(env: Record<string, string>): Promise<ProviderInfo[]> {
   return [
     {
       id: 'local',
-      label: 'espeak-ng (local)',
+      label: 'Local',
       ok: espeak,
       ...(espeak ? {} : { error: 'espeak-ng is not installed on this machine.' }),
       voices: ESPEAK_VOICES,
@@ -388,14 +471,17 @@ async function providers(env: Record<string, string>): Promise<ProviderInfo[]> {
     },
     {
       id: 'gemini',
-      label: 'Gemini AI',
+      label: 'Gemini',
       ok: geminiKey !== '',
       ...(geminiKey ? {} : { error: 'GEMINI_API_KEY is not set for the dev server.' }),
       voices: GEMINI_VOICES,
       rate: false,
       direction: true,
     },
-    await elevenProvider(env.ELEVENLABS_API_KEY ?? ''),
+    ...(await Promise.all([
+      elevenProvider(env.ELEVENLABS_API_KEY ?? ''),
+      mistralProvider(env.MISTRAL_API_KEY ?? ''),
+    ])),
   ];
 }
 
@@ -428,13 +514,20 @@ async function handle(
     const voice = typeof body.voice === 'string' ? body.voice : '';
     const direction = typeof body.direction === 'string' ? body.direction.slice(0, 600) : '';
     const provider =
-      body.provider === 'gemini' || body.provider === 'elevenlabs' ? body.provider : 'local';
+      body.provider === 'gemini' || body.provider === 'elevenlabs' || body.provider === 'mistral'
+        ? body.provider
+        : 'local';
 
     if (!text) return fail(400, 'Nothing to say.');
     if (text.length > MAX_TEXT) return fail(400, `Line is longer than ${MAX_TEXT} characters.`);
 
     let wav: Buffer;
-    if (provider === 'elevenlabs') {
+    if (provider === 'mistral') {
+      const key = env.MISTRAL_API_KEY ?? '';
+      if (!key) return fail(503, 'MISTRAL_API_KEY is not set for the dev server.');
+      if (!MISTRAL_VOICE_RE.test(voice)) return fail(400, `Not a Mistral voice id: ${voice}`);
+      wav = await speakMistral(text, voice, key, env.MISTRAL_TTS_MODEL || DEFAULT_MISTRAL_MODEL);
+    } else if (provider === 'elevenlabs') {
       const key = env.ELEVENLABS_API_KEY ?? '';
       if (!key) return fail(503, 'ELEVENLABS_API_KEY is not set for the dev server.');
       if (!ELEVEN_VOICE_RE.test(voice)) return fail(400, `Not an ElevenLabs voice id: ${voice}`);

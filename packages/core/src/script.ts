@@ -24,10 +24,10 @@ export interface ScriptLine {
 
 /**
  * Who speaks. `local` is espeak-ng on the machine running the dev server —
- * free, offline, robotic. `gemini` and `elevenlabs` are hosted, need a key,
- * and sound like people.
+ * free, offline, robotic. `gemini`, `elevenlabs` and `mistral` are hosted,
+ * need a key, and sound like people.
  */
-export type VoiceProvider = 'local' | 'gemini' | 'elevenlabs';
+export type VoiceProvider = 'local' | 'gemini' | 'elevenlabs' | 'mistral';
 
 export interface VoiceStyle {
   provider: VoiceProvider;

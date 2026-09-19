@@ -222,7 +222,9 @@ function parseStyle(v: unknown): ProjectStyle {
     },
     voice: {
       provider:
-        voice.provider === 'gemini' || voice.provider === 'elevenlabs'
+        voice.provider === 'gemini' ||
+        voice.provider === 'elevenlabs' ||
+        voice.provider === 'mistral'
           ? voice.provider
           : 'local',
       voice: str(voice.voice, d.voice.voice),

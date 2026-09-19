@@ -107,6 +107,14 @@ describe('parseProject repairs a hand-edited file', () => {
     expect(p.style.background).toEqual(DEFAULT_STYLE.background);
   });
 
+  it('keeps every known voice provider and falls back to local for anything else', () => {
+    for (const provider of ['local', 'gemini', 'elevenlabs', 'mistral'] as const) {
+      const p = edited({ style: { voice: { provider, voice: 'x' } } });
+      expect(p.style.voice.provider).toBe(provider);
+    }
+    expect(edited({ style: { voice: { provider: 'openai' } } }).style.voice.provider).toBe('local');
+  });
+
   it('clamps times to the recording rather than seeking off the end', () => {
     const p = edited({
       zooms: [{ tStart: -5000, tEnd: 999_999, targetXNorm: 9, targetYNorm: -9, scale: 2 }],
