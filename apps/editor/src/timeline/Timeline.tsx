@@ -1,5 +1,4 @@
 import {
-  cutDuration,
   lineDuration,
   normalizeCuts,
   type CaptionCue,
@@ -9,18 +8,11 @@ import {
   type ZoomKeyframe,
 } from '@demoforge/core';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { captionSlotAt, insertCaption, moveCaption } from './captionOps.js';
-import { applyDrag, freeSlotAt, insertZoom, snapWithin, type DragMode } from './kfOps.js';
+import { insertCaption, moveCaption } from './captionOps.js';
+import { applyDrag, insertZoom, snapWithin, type DragMode } from './kfOps.js';
 import { insertLine, moveLine } from './scriptOps.js';
 import Pill from './Pill.js';
-import {
-  IconCaption,
-  IconFit,
-  IconScissors,
-  IconScript,
-  IconTrash,
-  IconZoom,
-} from '../panels/icons.js';
+import { IconFilm } from '../panels/icons.js';
 import { fullView, panView, revealTime, zoomView, type View } from './view.js';
 
 export type Selection = { kind: 'zoom' | 'caption' | 'cut' | 'script'; index: number } | null;
@@ -29,15 +21,10 @@ const TICK_STEPS_MS = [
   100, 250, 500, 1000, 2000, 5000, 10_000, 15_000, 30_000, 60_000, 120_000, 300_000,
 ];
 const MIN_LABEL_GAP_PX = 68;
-const LANE_LABEL_W = 62;
 /** A fresh cut is this long; drag its edges from there. */
 const DEFAULT_CUT_MS = 2000;
-const MIN_VISIBLE_CUT_MS = 200;
 
-const BTN =
-  'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-zinc-300 hover:bg-white/5 hover:text-white disabled:pointer-events-none disabled:opacity-35';
-const KBD = 'rounded bg-zinc-800 px-1 font-mono text-[10px] text-zinc-500';
-const LANE = 'relative h-11 border-b border-white/5';
+const LANE = 'relative h-11';
 
 /** "1.2s – 4.6s": the second line on a pill. */
 const rangeLabel = (a: number, b: number): string => `${(a / 1000).toFixed(1)}s – ${(b / 1000).toFixed(1)}s`;
@@ -64,6 +51,8 @@ interface Props {
   addCaptionSignal: number;
   addCutSignal: number;
   addLineSignal: number;
+  /** Bumped to show the whole recording again. */
+  fitSignal: number;
 }
 
 function label(ms: number, sub: boolean): string {
@@ -93,6 +82,7 @@ export default function Timeline({
   addCaptionSignal,
   addCutSignal,
   addLineSignal,
+  fitSignal,
 }: Props) {
   const selZoom = selection?.kind === 'zoom' ? selection.index : null;
   const selCaption = selection?.kind === 'caption' ? selection.index : null;
@@ -267,6 +257,13 @@ export default function Timeline({
     addLineAt(timeMs);
   }, [addLineSignal, addLineAt, timeMs]);
 
+  const lastFit = useRef(fitSignal);
+  useEffect(() => {
+    if (fitSignal === lastFit.current) return;
+    lastFit.current = fitSignal;
+    setView(fullView(duration));
+  }, [fitSignal, duration]);
+
   const lastCut = useRef(addCutSignal);
   useEffect(() => {
     if (addCutSignal === lastCut.current) return;
@@ -274,87 +271,12 @@ export default function Timeline({
     addCutAt(timeMs);
   }, [addCutSignal, addCutAt, timeMs]);
 
-  const canAddCut = timeMs < duration - MIN_VISIBLE_CUT_MS;
-  const canAddZoom = freeSlotAt(keyframes, timeMs, duration) !== null;
-  const canAddCaption = captionSlotAt(captions, timeMs, duration) !== null;
   const playheadX = toPx(Math.min(timeMs, duration));
 
   return (
-    <div className="select-none">
-      <div className="flex items-center gap-1 border-b border-white/5 px-3 py-2 text-xs text-zinc-500">
-        <button
-          onClick={() => addZoomAt(timeMs)}
-          disabled={!canAddZoom}
-          className={BTN}
-        >
-          <IconZoom /> Zoom <kbd className={KBD}>Z</kbd>
-        </button>
-        <button
-          onClick={() => addCaptionAt(timeMs)}
-          disabled={!canAddCaption}
-          className={BTN}
-        >
-          <IconCaption /> Caption <kbd className={KBD}>C</kbd>
-        </button>
-        <button
-          onClick={() => {
-            if (!selection) return;
-            if (selection.kind === 'zoom') {
-              setKeyframes(keyframes.filter((_, i) => i !== selection.index));
-            } else if (selection.kind === 'caption') {
-              setCaptions(captions.filter((_, i) => i !== selection.index));
-            } else if (selection.kind === 'script') {
-              setScript(script.filter((_, i) => i !== selection.index));
-            } else {
-              setCuts(cuts.filter((_, i) => i !== selection.index));
-            }
-            onSelect(null);
-          }}
-          disabled={!selection}
-          className={BTN}
-        >
-          <IconTrash /> Delete
-        </button>
-        <button
-          onClick={() => addLineAt(timeMs)}
-          className={BTN}
-        >
-          <IconScript /> Line <kbd className={KBD}>N</kbd>
-        </button>
-        <button
-          onClick={() => addCutAt(timeMs)}
-          disabled={!canAddCut}
-          className={BTN}
-        >
-          <IconScissors /> Cut <kbd className={KBD}>T</kbd>
-        </button>
-        <button
-          onClick={() => setView(fullView(duration))}
-          className={BTN}
-        >
-          <IconFit /> Fit
-        </button>
-        {cuts.length > 0 && (
-          <span className="text-red-300/80">
-            {(cutDuration(cuts) / 1000).toFixed(1)}s cut
-          </span>
-        )}
-        <span className="ml-auto flex items-center gap-3 text-[11px]">
-          <span><kbd className={KBD}>Shift+Scroll</kbd> pan</span>
-          <span><kbd className={KBD}>Ctrl+Scroll</kbd> zoom</span>
-        </span>
-      </div>
-
+    <div className="select-none px-4">
       <div className="flex">
-        <div className="shrink-0 pt-7 pl-4 text-[11px] text-zinc-500" style={{ width: LANE_LABEL_W }}>
-          {['Cut', 'Zoom', 'Caption', 'Voice', 'Clip'].map((l) => (
-            <div key={l} className="flex h-11 items-center">
-              {l}
-            </div>
-          ))}
-        </div>
-
-        <div ref={scrollRef} className="relative min-w-0 flex-1 overflow-hidden pr-4">
+        <div ref={scrollRef} className="relative min-w-0 flex-1 overflow-hidden">
           {/* Ruler — click or drag anywhere on it to scrub. */}
           <div
             onPointerDown={(e) => {
@@ -364,20 +286,20 @@ export default function Timeline({
             onPointerMove={(e) => {
               if (e.buttons === 1) onSeek(toMs(e.clientX));
             }}
-            className="relative h-7 cursor-ew-resize border-b border-white/5"
+            className="relative mb-1 h-7 cursor-ew-resize"
           >
             {ticks.map((t) => (
               <div
                 key={t}
                 style={{ left: toPx(t) }}
-                className="absolute bottom-0 h-2 border-l border-zinc-700"
+                className="absolute bottom-1 h-1 w-1 -translate-x-1/2 rounded-full bg-faint"
               />
             ))}
             {ticks.map((t) => (
               <div
                 key={`l${t}`}
                 style={{ left: toPx(t) }}
-                className={`absolute top-1 text-[10px] text-zinc-500 tabular-nums ${t > 0 ? "-translate-x-1/2" : "pl-1"}`}
+                className={`absolute top-1 text-[10px] text-muted tabular-nums ${t > 0 ? "-translate-x-1/2" : "pl-1"}`}
               >
                 {label(t, step < 1000)}
               </div>
@@ -387,44 +309,21 @@ export default function Timeline({
                 key={i}
                 style={{ left: toPx(c.t) }}
                 title={c.el?.text ?? 'click'}
-                className="absolute bottom-0 h-2 w-px bg-amber-400/80"
+                className="absolute bottom-0.5 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-blue-500"
               />
             ))}
           </div>
 
-          <div
-            onPointerDown={() => onSelect(null)}
-            onDoubleClick={(e) => addCutAt(toMs(e.clientX))}
-            className={LANE}
-          >
-            {cuts.map((cut, i) => {
-              const l = toPx(cut.tStart);
-              const w = (cut.tEnd - cut.tStart) * pxPerMs;
-              if (l + w < -20 || l > width + 20) return null;
-              return (
-                <Pill
-                  key={i}
-                  tone="cut"
-                  leftPx={l}
-                  widthPx={w}
-                  pxPerMs={pxPerMs}
-                  selected={selCut === i}
-                  title={`Skips ${((cut.tEnd - cut.tStart) / 1000).toFixed(1)}s of source`}
-                  label={`Cut ${((cut.tEnd - cut.tStart) / 1000).toFixed(1)}s`}
-                  sub={rangeLabel(cut.tStart, cut.tEnd)}
-                  onSelect={() => onSelect({ kind: 'cut', index: i })}
-                  onDrag={(mode, delta) => onCutDrag(i, mode, delta)}
-                  onDragEnd={() => {
-                    cutBase.current = null;
-                  }}
-                />
-              );
-            })}
-            {cuts.length === 0 && (
-              <span className="pointer-events-none absolute inset-0 grid place-items-center text-[11px] text-zinc-600/80">
-                Press T to cut a section out
+          <div className="relative h-12">
+            <div
+              style={{ left: toPx(0), width: duration * pxPerMs }}
+              className="absolute inset-y-1 flex flex-col items-center justify-center overflow-hidden rounded-xl border border-sky-500/30 bg-sky-500/15 text-[11px] font-medium text-fg"
+            >
+              <span className="flex max-w-full items-center gap-1.5 truncate px-2">
+                <IconFilm /> {mediaName}
               </span>
-            )}
+              <span className="text-[9px] font-normal text-muted">{rangeLabel(0, duration)}</span>
+            </div>
           </div>
 
           <div
@@ -456,8 +355,43 @@ export default function Timeline({
               );
             })}
             {keyframes.length === 0 && (
-              <span className="pointer-events-none absolute inset-0 grid place-items-center text-[11px] text-zinc-600/80">
+              <span className="pointer-events-none absolute inset-0 grid place-items-center text-[11px] text-faint/80">
                 Press Z to add a zoom
+              </span>
+            )}
+          </div>
+
+          <div
+            onPointerDown={() => onSelect(null)}
+            onDoubleClick={(e) => addCutAt(toMs(e.clientX))}
+            className={LANE}
+          >
+            {cuts.map((cut, i) => {
+              const l = toPx(cut.tStart);
+              const w = (cut.tEnd - cut.tStart) * pxPerMs;
+              if (l + w < -20 || l > width + 20) return null;
+              return (
+                <Pill
+                  key={i}
+                  tone="cut"
+                  leftPx={l}
+                  widthPx={w}
+                  pxPerMs={pxPerMs}
+                  selected={selCut === i}
+                  title={`Skips ${((cut.tEnd - cut.tStart) / 1000).toFixed(1)}s of source`}
+                  label={`Cut ${((cut.tEnd - cut.tStart) / 1000).toFixed(1)}s`}
+                  sub={rangeLabel(cut.tStart, cut.tEnd)}
+                  onSelect={() => onSelect({ kind: 'cut', index: i })}
+                  onDrag={(mode, delta) => onCutDrag(i, mode, delta)}
+                  onDragEnd={() => {
+                    cutBase.current = null;
+                  }}
+                />
+              );
+            })}
+            {cuts.length === 0 && (
+              <span className="pointer-events-none absolute inset-0 grid place-items-center text-[11px] text-faint/80">
+                Press T to cut a section out
               </span>
             )}
           </div>
@@ -491,7 +425,7 @@ export default function Timeline({
               );
             })}
             {captions.length === 0 && (
-              <span className="pointer-events-none absolute inset-0 grid place-items-center text-[11px] text-zinc-600/80">
+              <span className="pointer-events-none absolute inset-0 grid place-items-center text-[11px] text-faint/80">
                 Press C to add a caption
               </span>
             )}
@@ -526,29 +460,19 @@ export default function Timeline({
               );
             })}
             {script.length === 0 && (
-              <span className="pointer-events-none absolute inset-0 grid place-items-center text-[11px] text-zinc-600/80">
+              <span className="pointer-events-none absolute inset-0 grid place-items-center text-[11px] text-faint/80">
                 Press N to add a narration line
               </span>
             )}
           </div>
 
-          <div className="relative h-11">
-            <div
-              style={{ left: toPx(0), width: duration * pxPerMs }}
-              className="absolute inset-y-1 flex items-center gap-1.5 overflow-hidden rounded-lg border border-white/10 bg-zinc-800 px-2.5 text-[11px] text-zinc-300"
-            >
-              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
-              <span className="truncate">{mediaName}</span>
-            </div>
-          </div>
-
           {/* What the export will drop, shaded across every lane. */}
-          <div className="pointer-events-none absolute top-7 right-4 bottom-0 left-0">
+          <div className="pointer-events-none absolute top-7 right-0 bottom-0 left-0">
             {cuts.map((cut, i) => (
               <div
                 key={i}
                 style={{ left: toPx(cut.tStart), width: (cut.tEnd - cut.tStart) * pxPerMs }}
-                className="absolute inset-y-0 border-x border-red-400/40 bg-zinc-950/65"
+                className="absolute inset-y-0 border-x border-red-400/40 bg-app/65"
               />
             ))}
           </div>
@@ -556,9 +480,9 @@ export default function Timeline({
           {/* Playhead spans every lane. */}
           <div
             style={{ left: playheadX }}
-            className="pointer-events-none absolute top-0 bottom-0 w-0.5 -translate-x-1/2 bg-blue-500"
+            className="pointer-events-none absolute top-0 bottom-0 w-0.5 -translate-x-1/2 bg-blue-600"
           >
-            <span className="absolute top-0.5 left-1/2 h-3 w-3 -translate-x-1/2 rounded-full bg-blue-500 ring-2 ring-zinc-900" />
+            <span className="absolute top-0.5 left-1/2 h-3 w-3 -translate-x-1/2 rounded-full bg-blue-600 ring-2 ring-panel" />
           </div>
         </div>
       </div>

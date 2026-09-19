@@ -73,20 +73,26 @@ export default function Sidebar(p: Props) {
   const selLine = p.selection?.kind === 'script' ? p.selection.index : null;
 
   return (
-    <div className="flex min-h-0 overflow-hidden rounded-2xl bg-zinc-900 ring-1 ring-white/5">
+    <div className="flex min-h-0 gap-2">
+      <nav className="flex w-12 shrink-0 flex-col items-center gap-1.5 pt-1">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            title={t.title}
+            onClick={() => setOpen(open === t.id ? null : t.id)}
+            className={`relative flex h-9 w-9 items-center justify-center rounded-lg transition outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+              open === t.id
+                ? 'bg-blue-600/10 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400'
+                : 'text-muted hover:bg-raised hover:text-fg'
+            }`}
+          >
+            {t.icon}
+          </button>
+        ))}
+      </nav>
       {active && (
-        <aside className="flex w-72 shrink-0 flex-col overflow-y-auto text-xs">
-          <header className="sticky top-0 z-10 flex items-center justify-between bg-zinc-900 px-4 pt-4 pb-3">
-            <h2 className="text-sm font-semibold text-zinc-100">{active.title}</h2>
-            <button
-              onClick={() => setOpen(null)}
-              title="Collapse panel"
-              className="rounded px-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-            >
-              ›
-            </button>
-          </header>
-          <div className="p-4">
+        <aside className="flex w-72 shrink-0 flex-col overflow-y-auto rounded-2xl bg-panel text-xs shadow-lg ring-1 shadow-black/5 ring-line">
+          <div className="p-3">
             {open === 'script' && (
               <ScriptPanel
                 rec={p.rec}
@@ -142,23 +148,6 @@ export default function Sidebar(p: Props) {
           </div>
         </aside>
       )}
-
-      <nav className="flex w-14 shrink-0 flex-col items-center gap-1.5 border-l border-white/5 py-3">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            title={t.title}
-            onClick={() => setOpen(open === t.id ? null : t.id)}
-            className={`flex h-10 w-10 items-center justify-center rounded-xl transition ${
-              open === t.id
-                ? 'bg-blue-500/15 text-blue-400'
-                : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-200'
-            }`}
-          >
-            {t.icon}
-          </button>
-        ))}
-      </nav>
     </div>
   );
 }

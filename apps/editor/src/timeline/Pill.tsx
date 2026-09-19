@@ -10,24 +10,24 @@ const TWO_LINE_PX = 76;
 
 const TONES = {
   zoom: {
-    on: 'border-blue-300 bg-blue-500/45 text-white ring-2 ring-blue-300/50',
-    off: 'border-blue-500/40 bg-blue-500/25 text-blue-50 hover:bg-blue-500/35',
-    grip: 'bg-blue-400',
+    on: 'border-violet-500 bg-violet-500/30 text-fg ring-2 ring-violet-500/30',
+    off: 'border-violet-500/30 bg-violet-500/15 text-fg hover:bg-violet-500/25',
+    grip: 'bg-violet-500/70',
   },
   cut: {
-    on: 'border-red-300 bg-red-500/45 text-white ring-2 ring-red-300/50',
-    off: 'border-red-500/40 bg-red-500/25 text-red-50 hover:bg-red-500/35',
-    grip: 'bg-red-400',
+    on: 'border-red-500 bg-red-500/30 text-fg ring-2 ring-red-500/30',
+    off: 'border-red-500/30 bg-red-500/15 text-fg hover:bg-red-500/25',
+    grip: 'bg-red-500/70',
   },
   voice: {
-    on: 'border-violet-300 bg-violet-500/45 text-white ring-2 ring-violet-300/50',
-    off: 'border-violet-500/40 bg-violet-500/25 text-violet-50 hover:bg-violet-500/35',
-    grip: 'bg-violet-400',
+    on: 'border-emerald-500 bg-emerald-500/30 text-fg ring-2 ring-emerald-500/30',
+    off: 'border-emerald-500/30 bg-emerald-500/15 text-fg hover:bg-emerald-500/25',
+    grip: 'bg-emerald-500/70',
   },
   caption: {
-    on: 'border-emerald-300 bg-emerald-500/45 text-white ring-2 ring-emerald-300/50',
-    off: 'border-emerald-500/40 bg-emerald-500/25 text-emerald-50 hover:bg-emerald-500/35',
-    grip: 'bg-emerald-400',
+    on: 'border-amber-500 bg-amber-500/30 text-fg ring-2 ring-amber-500/30',
+    off: 'border-amber-500/30 bg-amber-500/15 text-fg hover:bg-amber-500/25',
+    grip: 'bg-amber-500/70',
   },
 } as const;
 
@@ -91,7 +91,7 @@ export default function Pill({
       onPointerDown={begin('move')}
       style={{ left: leftPx, width: Math.max(6, widthPx) }}
       title={title}
-      className={`absolute inset-y-1 flex cursor-grab items-center justify-between overflow-hidden rounded-lg border text-[11px] font-medium select-none active:cursor-grabbing ${
+      className={`absolute inset-y-1 flex cursor-grab items-center justify-between overflow-hidden rounded-xl border text-[11px] font-medium select-none active:cursor-grabbing ${
         selected ? t.on : t.off
       }`}
     >

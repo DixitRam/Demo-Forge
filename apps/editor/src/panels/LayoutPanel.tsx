@@ -25,14 +25,14 @@ export default function LayoutPanel({
                 onClick={() => setStyle({ ...style, aspect: p.value })}
                 className={`flex flex-col items-center gap-1.5 rounded-lg border py-2 transition ${
                   active
-                    ? 'border-blue-400 bg-blue-500/10 text-blue-100'
-                    : 'border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200'
+                    ? 'border-blue-400 bg-blue-600/10 text-blue-700 dark:text-blue-100'
+                    : 'border-line text-muted hover:border-line hover:text-fg'
                 }`}
               >
                 <span
                   style={{ aspectRatio: String(ratio) }}
                   className={`w-8 rounded-[3px] border ${
-                    active ? 'border-blue-300 bg-blue-400/20' : 'border-zinc-600'
+                    active ? 'border-blue-300 bg-blue-400/20' : 'border-line'
                   }`}
                 />
                 <span className="text-[10px]">{p.label}</span>
@@ -40,7 +40,7 @@ export default function LayoutPanel({
             );
           })}
         </div>
-        <p className="text-[11px] leading-relaxed text-zinc-500">
+        <p className="text-[11px] leading-relaxed text-muted">
           The recording is fitted inside the chosen frame — nothing is cropped, so a tall frame
           around a wide capture leaves more background above and below.
         </p>

@@ -31,7 +31,7 @@ export default function ZoomPanel({
     <div className="flex flex-col gap-5">
       <Section label="Auto-zoom">
         <Toggle label="Enabled" checked={enabled} onChange={setEnabled} />
-        <p className="text-[11px] leading-relaxed text-zinc-500">
+        <p className="text-[11px] leading-relaxed text-muted">
           {keyframes.length} zoom{keyframes.length === 1 ? '' : 's'} planned from the click log.
         </p>
       </Section>
@@ -47,19 +47,19 @@ export default function ZoomPanel({
           format={(v) => `${v.toFixed(2)}×`}
         />
         {kf && (
-          <dl className="grid grid-cols-2 gap-y-1 font-mono text-[11px] text-zinc-500">
+          <dl className="grid grid-cols-2 gap-y-1 font-mono text-[11px] text-muted">
             <dt>start</dt>
-            <dd className="text-right text-zinc-300">{(kf.tStart / 1000).toFixed(2)}s</dd>
+            <dd className="text-right text-fg">{(kf.tStart / 1000).toFixed(2)}s</dd>
             <dt>end</dt>
-            <dd className="text-right text-zinc-300">{(kf.tEnd / 1000).toFixed(2)}s</dd>
+            <dd className="text-right text-fg">{(kf.tEnd / 1000).toFixed(2)}s</dd>
             <dt>target</dt>
-            <dd className="text-right text-zinc-300">
+            <dd className="text-right text-fg">
               {kf.targetXNorm.toFixed(2)}, {kf.targetYNorm.toFixed(2)}
             </dd>
           </dl>
         )}
         {!kf && (
-          <p className="text-[11px] leading-relaxed text-zinc-500">
+          <p className="text-[11px] leading-relaxed text-muted">
             Select a zoom on the timeline to edit it on its own.
           </p>
         )}
@@ -67,7 +67,7 @@ export default function ZoomPanel({
 
       <button
         onClick={onReplan}
-        className="rounded-lg bg-zinc-800 px-2 py-2 text-zinc-200 hover:bg-zinc-700"
+        className="rounded-lg bg-raised px-2 py-2 text-fg hover:bg-hover"
       >
         Re-plan from click log
       </button>

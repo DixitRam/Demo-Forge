@@ -1,5 +1,6 @@
 import { editedDuration, type CaptionCue, type CutRegion, type ZoomKeyframe } from '@demoforge/core';
 import { useRef, useState } from 'react';
+import { IconExport } from '../panels/icons.js';
 import type { LoadedProject } from '../import/loadRecording.js';
 import type { FrameStyle } from '../render/style.js';
 import { exportMp4 } from './exportMp4.js';
@@ -63,31 +64,31 @@ export default function ExportDialog({
     }
   };
 
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        className="rounded-lg bg-blue-500 px-3.5 py-1.5 text-xs font-medium text-white hover:bg-blue-400"
-      >
-        Export MP4
-      </button>
-    );
-  }
-
   const busy = stage !== null;
 
   return (
-    <div className="ml-auto flex items-center gap-3 text-xs">
-      <span className="text-zinc-500" title="Length after cuts">
-        {(editedDuration(cuts, project.rec.video.durationMs) / 1000).toFixed(1)}s
-      </span>
-      <label className="flex items-center gap-1 text-zinc-400">
-        fps
+    <div className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-blue-500"
+      >
+        <IconExport /> Export
+      </button>
+      {open && (
+    <div className="absolute top-10 right-0 z-30 flex w-72 flex-col gap-3 rounded-xl bg-panel p-3 text-xs shadow-xl ring-1 ring-line">
+      <div className="flex items-center justify-between">
+        <span className="font-semibold">Export MP4</span>
+        <span className="text-muted" title="Length after cuts">
+          {(editedDuration(cuts, project.rec.video.durationMs) / 1000).toFixed(1)}s
+        </span>
+      </div>
+      <label className="flex items-center justify-between text-muted">
+        Frame rate
         <select
           value={fps}
           disabled={busy}
           onChange={(e) => setFps(Number(e.target.value))}
-          className="rounded bg-zinc-800 px-1 py-0.5 text-zinc-200"
+          className="rounded-md bg-raised px-2 py-1 text-fg"
         >
           {FPS_CHOICES.map((f) => (
             <option key={f} value={f}>
@@ -98,8 +99,8 @@ export default function ExportDialog({
       </label>
 
       {busy && (
-        <span className="flex items-center gap-2 text-zinc-400">
-          <span className="h-1.5 w-32 overflow-hidden rounded bg-zinc-800">
+        <span className="flex items-center gap-2 text-muted">
+          <span className="h-1.5 flex-1 overflow-hidden rounded bg-raised">
             <span
               style={{ width: `${ratio * 100}%` }}
               className="block h-full bg-blue-400 transition-[width]"
@@ -109,13 +110,13 @@ export default function ExportDialog({
         </span>
       )}
 
-      {error && <span className="max-w-64 truncate text-red-400">{error}</span>}
+      {error && <span className="text-red-600 dark:text-red-400">{error}</span>}
 
       {url && (
         <a
           href={url}
           download="demo.mp4"
-          className="rounded-lg bg-blue-500 px-3 py-1.5 font-medium text-white hover:bg-blue-400"
+          className="rounded-lg bg-emerald-600 px-3 py-2 text-center font-medium text-white hover:bg-emerald-500"
         >
           Download demo.mp4
         </a>
@@ -124,17 +125,19 @@ export default function ExportDialog({
       {busy ? (
         <button
           onClick={() => abort.current?.abort()}
-          className="rounded bg-zinc-800 px-3 py-1 text-zinc-200 hover:bg-zinc-700"
+          className="rounded-lg bg-raised px-3 py-2 text-fg hover:bg-hover"
         >
           Cancel
         </button>
       ) : (
         <button
           onClick={() => void run()}
-          className="rounded bg-blue-500 px-3 py-1 font-medium text-white hover:bg-blue-400"
+          className="rounded-lg bg-blue-600 px-3 py-2 font-medium text-white hover:bg-blue-500"
         >
           {url ? 'Render again' : 'Render'}
         </button>
+      )}
+    </div>
       )}
     </div>
   );

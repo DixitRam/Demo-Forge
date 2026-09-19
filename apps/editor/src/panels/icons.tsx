@@ -120,3 +120,16 @@ export const IconFit = () => (
     <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
   </svg>
 );
+
+export const IconFilm = () => (
+  <svg {...base} width={13} height={13}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4" />
+  </svg>
+);
+
+export const IconExport = () => (
+  <svg {...base} width={14} height={14}>
+    <path d="M12 3v12M7 8l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" />
+  </svg>
+);

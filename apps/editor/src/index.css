@@ -1,10 +1,54 @@
 @import 'tailwindcss';
 
+/*
+ * Two themes from one set of names, following the system setting. Every
+ * surface in the editor uses these tokens, never raw greys, so a colour
+ * change happens here once.
+ */
+@theme {
+  --color-app: var(--app);
+  --color-panel: var(--panel);
+  --color-raised: var(--raised);
+  --color-hover: var(--hover);
+  --color-line: var(--line);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+}
+
+:root {
+  --app: #ecebe8;
+  --panel: #fbfbfa;
+  --raised: #eeede9;
+  --hover: #e2e1dc;
+  --line: rgb(0 0 0 / 0.08);
+  --fg: #1d1d1f;
+  --muted: #6e6e73;
+  --faint: #a1a1a6;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --app: #0c0c0e;
+    --panel: #161618;
+    --raised: #232326;
+    --hover: #2e2e32;
+    --line: rgb(255 255 255 / 0.07);
+    --fg: #ececee;
+    --muted: #8e8e93;
+    --faint: #5c5c61;
+    color-scheme: dark;
+  }
+}
+
 html,
 body,
 #root {
   height: 100%;
 }
 body {
-  @apply bg-zinc-950 text-zinc-200;
+  @apply bg-app text-fg antialiased;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, 'Segoe UI', system-ui, sans-serif;
 }

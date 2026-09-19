@@ -8,15 +8,21 @@ import CutInspector from './panels/CutInspector.js';
 import ZoomInspector from './panels/ZoomInspector.js';
 import FocusOverlay from './player/FocusOverlay.js';
 import Player from './player/Player.js';
-import Transport from './player/Transport.js';
+import Transport, { AspectPicker } from './player/Transport.js';
+import { IconCaption, IconFit, IconScissors, IconScript, IconTrash, IconZoom } from './panels/icons.js';
+import { captionSlotAt } from './timeline/captionOps.js';
 import { useProject } from './state/useProject.js';
-import { setTarget } from './timeline/kfOps.js';
+import { freeSlotAt, setTarget } from './timeline/kfOps.js';
 import Timeline, { type Selection } from './timeline/Timeline.js';
 import NarrationTrack from './voice/NarrationTrack.js';
 import { useVoice } from './voice/useVoice.js';
 import { useWriter } from './voice/useWriter.js';
 
 const FRAME_MS = 1000 / 30;
+/** A cut shorter than this at the very end is not worth adding. */
+const MIN_VISIBLE_CUT_MS = 200;
+const TOOL =
+  'flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs text-fg hover:bg-raised disabled:pointer-events-none disabled:opacity-35';
 
 export default function App() {
   const {
@@ -45,6 +51,7 @@ export default function App() {
   const [addCaption, setAddCaption] = useState(0);
   const [addCut, setAddCut] = useState(0);
   const [addLine, setAddLine] = useState(0);
+  const [fit, setFit] = useState(0);
 
   const active = useMemo(() => (zoomEnabled ? keyframes : []), [zoomEnabled, keyframes]);
 
@@ -118,31 +125,39 @@ export default function App() {
   // of an already-zoomed picture.
   const preview = aimIndex === null ? active : [];
 
+  const canAddZoom = freeSlotAt(keyframes, timeMs, duration) !== null;
+  const canAddCaption = captionSlotAt(captions, timeMs, duration) !== null;
+  const canAddCut = timeMs < duration - MIN_VISIBLE_CUT_MS;
+  const dot = project.mediaName.lastIndexOf('.');
+  const [baseName, ext] =
+    dot > 0 ? [project.mediaName.slice(0, dot), project.mediaName.slice(dot)] : [project.mediaName, ''];
+
   return (
-    <div className="flex h-full flex-col gap-2 bg-zinc-950 p-2">
-      <header className="flex items-center gap-3 px-2 pt-1">
-        <h1 className="text-sm font-semibold tracking-tight text-white">DemoForge</h1>
-        <span className="text-xs text-zinc-500">
-          {project.rec.events.length} events · {keyframes.length} zooms · {captions.length}{' '}
-          captions
-          {cuts.length > 0 && (
-            <>
-              {' '}
-              · <span className="text-red-300/80">{(cutDuration(cuts) / 1000).toFixed(1)}s cut</span>
-            </>
+    <div className="flex h-full flex-col bg-panel text-fg">
+      <header className="grid h-12 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 border-b border-line px-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <h1 className="text-sm font-semibold tracking-tight">DemoForge</h1>
+          <span className="truncate text-xs text-muted">
+            {project.rec.events.length} events · {keyframes.length} zooms · {captions.length} captions
+            {cuts.length > 0 && ` · ${(cutDuration(cuts) / 1000).toFixed(1)}s cut`}
+          </span>
+          {project.warning && (
+            <span className="truncate text-xs text-amber-600 dark:text-amber-400">{project.warning}</span>
           )}
-        </span>
-        {project.warning && (
-          <span className="truncate text-xs text-amber-400">{project.warning}</span>
-        )}
-        <button
-          onClick={() => save(voice.narration)}
-          title="Save project (S) — JSON you can edit by hand or with a script, plus the narration"
-          className="ml-auto rounded-lg px-3 py-1.5 text-xs text-zinc-300 ring-1 ring-white/10 hover:bg-zinc-800 hover:text-white"
-        >
-          Save project
-        </button>
-        <ExportDialog
+        </div>
+        <div className="truncate text-sm font-medium">
+          {baseName}
+          <span className="text-faint">{ext}</span>
+        </div>
+        <div className="flex items-center justify-end gap-2">
+          <button
+            onClick={() => save(voice.narration)}
+            title="Save project (S) — JSON you can edit by hand or with a script, plus the narration"
+            className="rounded-lg px-3 py-1.5 text-xs font-medium text-fg hover:bg-raised"
+          >
+            Save
+          </button>
+          <ExportDialog
           project={project}
           keyframes={active}
           captions={captions}
@@ -150,67 +165,10 @@ export default function App() {
           style={style}
           narration={voice.narration}
         />
+        </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 gap-2">
-        <main className="relative flex min-h-0 flex-1 flex-col items-center gap-4 overflow-hidden rounded-2xl bg-zinc-900 ring-1 ring-white/5 p-6 pb-4">
-          <div className="flex min-h-0 w-full flex-1 items-center justify-center">
-          <Player
-            project={project}
-            keyframes={preview}
-            captions={captions}
-            cuts={cuts}
-            style={style}
-            onTime={setTimeMs}
-            overlay={
-              aimIndex === null
-                ? undefined
-                : ({ w, h }) => (
-                    <FocusOverlay
-                      kf={keyframes[aimIndex]!}
-                      canvasW={w}
-                      canvasH={h}
-                      videoW={project.video.videoWidth}
-                      videoH={project.video.videoHeight}
-                      viewport={project.rec.viewport}
-                      style={style}
-                      onPlace={(x, y) => setKeyframes(setTarget(keyframes, aimIndex, x, y))}
-                    />
-                  )
-            }
-          />
-          </div>
-          <Transport
-            video={project.video}
-            timeMs={timeMs}
-            durationMs={duration}
-            style={style}
-            setStyle={setStyle}
-          />
-          {selection?.kind === 'cut' && selection.index < cuts.length && (
-            <CutInspector
-              cuts={cuts}
-              index={selection.index}
-              onClose={() => setSelection(null)}
-              onDelete={deleteSelected}
-            />
-          )}
-          {aimIndex !== null && (
-            <ZoomInspector
-              rec={project.rec}
-              keyframes={keyframes}
-              setKeyframes={setKeyframes}
-              index={aimIndex}
-              onClose={() => setSelection(null)}
-              onDelete={deleteSelected}
-            />
-          )}
-        </main>
-        <NarrationTrack
-          video={project.video}
-          url={voice.narrationUrl}
-          gain={style.voice.gain}
-        />
+      <div className="flex min-h-0 flex-1 gap-3 p-3 pb-0">
         <Sidebar
           rec={project.rec}
           style={style}
@@ -250,9 +208,91 @@ export default function App() {
           }}
           videoAspect={videoAspect}
         />
+
+        <main className="relative flex min-w-0 flex-1 flex-col">
+          <div className="flex h-8 shrink-0 items-center justify-center">
+            <AspectPicker style={style} setStyle={setStyle} />
+          </div>
+          <div className="flex min-h-0 flex-1 items-center justify-center p-2">
+          <Player
+            project={project}
+            keyframes={preview}
+            captions={captions}
+            cuts={cuts}
+            style={style}
+            onTime={setTimeMs}
+            overlay={
+              aimIndex === null
+                ? undefined
+                : ({ w, h }) => (
+                    <FocusOverlay
+                      kf={keyframes[aimIndex]!}
+                      canvasW={w}
+                      canvasH={h}
+                      videoW={project.video.videoWidth}
+                      videoH={project.video.videoHeight}
+                      viewport={project.rec.viewport}
+                      style={style}
+                      onPlace={(x, y) => setKeyframes(setTarget(keyframes, aimIndex, x, y))}
+                    />
+                  )
+            }
+          />
+          </div>
+          <div className="grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4">
+            <div className="flex items-center gap-0.5">
+              <button onClick={() => setAddZoom((n) => n + 1)} disabled={!canAddZoom} title="Add a zoom at the playhead (Z)" className={TOOL}>
+                <IconZoom /> Zoom
+              </button>
+              <button onClick={() => setAddCut((n) => n + 1)} disabled={!canAddCut} title="Cut a section out (T)" className={TOOL}>
+                <IconScissors /> Cut
+              </button>
+              <button onClick={() => setAddCaption((n) => n + 1)} disabled={!canAddCaption} title="Add a caption (C)" className={TOOL}>
+                <IconCaption /> Caption
+              </button>
+              <button onClick={() => setAddLine((n) => n + 1)} title="Add a narration line (N)" className={TOOL}>
+                <IconScript /> Line
+              </button>
+              {selection && (
+                <button onClick={deleteSelected} title="Delete the selected item (Del)" className={`${TOOL} text-red-600 dark:text-red-400`}>
+                  <IconTrash />
+                </button>
+              )}
+            </div>
+            <Transport video={project.video} timeMs={timeMs} durationMs={duration} />
+            <div className="flex justify-end">
+              <button onClick={() => setFit((n) => n + 1)} title="Show the whole recording in the timeline" className={TOOL}>
+                <IconFit /> Fit
+              </button>
+            </div>
+          </div>
+          {selection?.kind === 'cut' && selection.index < cuts.length && (
+            <CutInspector
+              cuts={cuts}
+              index={selection.index}
+              onClose={() => setSelection(null)}
+              onDelete={deleteSelected}
+            />
+          )}
+          {aimIndex !== null && (
+            <ZoomInspector
+              rec={project.rec}
+              keyframes={keyframes}
+              setKeyframes={setKeyframes}
+              index={aimIndex}
+              onClose={() => setSelection(null)}
+              onDelete={deleteSelected}
+            />
+          )}
+        </main>
+        <NarrationTrack
+          video={project.video}
+          url={voice.narrationUrl}
+          gain={style.voice.gain}
+        />
       </div>
 
-      <footer className="rounded-2xl bg-zinc-900 ring-1 ring-white/5 pb-2">
+      <footer className="shrink-0 pt-1 pb-3">
         <Timeline
           rec={project.rec}
           keyframes={keyframes}
@@ -273,6 +313,7 @@ export default function App() {
           addCaptionSignal={addCaption}
           addCutSignal={addCut}
           addLineSignal={addLine}
+          fitSignal={fit}
         />
       </footer>
     </div>

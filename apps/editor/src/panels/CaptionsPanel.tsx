@@ -50,7 +50,7 @@ export default function CaptionsPanel({
           <button
             onClick={add}
             disabled={captionSlotAt(captions, timeMs, duration) === null}
-            className="flex-1 rounded-lg bg-zinc-800 py-2 text-zinc-200 hover:bg-zinc-700 disabled:opacity-40"
+            className="flex-1 rounded-lg bg-raised py-2 text-fg hover:bg-hover disabled:opacity-40"
           >
             + At playhead
           </button>
@@ -60,14 +60,14 @@ export default function CaptionsPanel({
               onSelect(null);
             }}
             title="One cue per click, using the element text the extension recorded"
-            className="flex-1 rounded-lg bg-zinc-800 py-2 text-zinc-200 hover:bg-zinc-700"
+            className="flex-1 rounded-lg bg-raised py-2 text-fg hover:bg-hover"
           >
             From clicks
           </button>
         </div>
 
         {captions.length === 0 && (
-          <p className="text-[11px] leading-relaxed text-zinc-500">
+          <p className="text-[11px] leading-relaxed text-muted">
             No captions yet. “From clicks” drafts one per click from the element text already in
             the log — no AI involved.
           </p>
@@ -80,14 +80,14 @@ export default function CaptionsPanel({
             value={cue.text}
             rows={3}
             onChange={(e) => setCaptions(setCaptionText(captions, selected, e.target.value))}
-            className="w-full resize-none rounded-lg border border-zinc-700 bg-zinc-900 p-2 text-zinc-100 outline-none focus:border-blue-500"
+            className="w-full resize-none rounded-lg border border-line bg-panel p-2 text-fg outline-none focus:border-blue-500"
           />
           <button
             onClick={() => {
               setCaptions(captions.filter((_, i) => i !== selected));
               onSelect(null);
             }}
-            className="rounded-lg border border-red-500/40 bg-red-500/10 py-1.5 text-red-300 hover:bg-red-500/20"
+            className="rounded-lg border border-red-500/40 bg-red-500/10 py-1.5 text-red-700 dark:text-red-300 hover:bg-red-500/20"
           >
             Delete caption
           </button>
@@ -96,15 +96,15 @@ export default function CaptionsPanel({
 
       {captions.length > 0 && (
         <Section label="Style">
-          <div className="flex gap-1 rounded-lg bg-zinc-900 p-1">
+          <div className="flex gap-1 rounded-lg bg-panel p-1">
             {(['top', 'bottom'] as const).map((p) => (
               <button
                 key={p}
                 onClick={() => setCs({ position: p })}
                 className={`flex-1 rounded-md py-1 capitalize ${
                   cs.position === p
-                    ? 'bg-blue-500 font-medium text-white'
-                    : 'text-zinc-400 hover:text-zinc-200'
+                    ? 'bg-blue-600 font-medium text-white'
+                    : 'text-muted hover:text-fg'
                 }`}
               >
                 {p}
@@ -121,16 +121,16 @@ export default function CaptionsPanel({
             format={(v) => `${Math.round(v * 1000) / 10}%`}
           />
           <label className="flex items-center justify-between">
-            <span className="text-zinc-400">Text colour</span>
+            <span className="text-muted">Text colour</span>
             <input
               type="color"
               value={cs.color}
               onChange={(e) => setCs({ color: e.target.value })}
-              className="h-7 w-12 rounded border border-zinc-700 bg-transparent"
+              className="h-7 w-12 rounded border border-line bg-transparent"
             />
           </label>
           <label className="flex items-center justify-between">
-            <span className="text-zinc-400">Plate behind text</span>
+            <span className="text-muted">Plate behind text</span>
             <input
               type="checkbox"
               checked={cs.background !== ''}
