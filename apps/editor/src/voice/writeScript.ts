@@ -10,13 +10,16 @@
  * chosen for a vision model rather than for looking at.
  */
 
-import type { ScriptStep, WrittenLine } from '@demoforge/core';
+import { pageRect, type DemoViewport, type ScriptStep, type WrittenLine } from '@demoforge/core';
 import { seek } from '../export/exportMp4.js';
 
 const ENDPOINT = '/api/script';
-/** Enough for a model to read UI labels; small enough to send two dozen of. */
-const FRAME_W = 720;
-const FRAME_QUALITY = 0.6;
+/**
+ * Real dashboards set labels at 12-14px. At 720 wide those turn to mush, so
+ * frames go at 1280 — about four image tiles each, still fine for two dozen.
+ */
+const FRAME_W = 1280;
+const FRAME_QUALITY = 0.8;
 
 export interface WriterStatus {
   ok: boolean;
@@ -66,11 +69,14 @@ function markClick(
 export async function captureFrames(
   video: HTMLVideoElement,
   steps: readonly ScriptStep[],
+  viewport: DemoViewport,
   onProgress?: (done: number, total: number) => void,
 ): Promise<Map<number, string>> {
-  const scale = Math.min(1, FRAME_W / (video.videoWidth || FRAME_W));
-  const w = Math.max(2, Math.round(video.videoWidth * scale));
-  const h = Math.max(2, Math.round(video.videoHeight * scale));
+  // Only the page, not tabCapture's letterbox: click coordinates are relative to it.
+  const page = pageRect(viewport, video.videoWidth, video.videoHeight);
+  const scale = Math.min(1, FRAME_W / (page.w || FRAME_W));
+  const w = Math.max(2, Math.round(page.w * scale));
+  const h = Math.max(2, Math.round(page.h * scale));
 
   const canvas = document.createElement('canvas');
   canvas.width = w;
@@ -86,7 +92,7 @@ export async function captureFrames(
   try {
     for (const [i, step] of steps.entries()) {
       await seek(video, frameTimeMs(step) / 1000);
-      ctx.drawImage(video, 0, 0, w, h);
+      ctx.drawImage(video, page.x, page.y, page.w, page.h, 0, 0, w, h);
       if (step.xNorm !== undefined && step.yNorm !== undefined) {
         markClick(ctx, w, h, step.xNorm, step.yNorm);
       }

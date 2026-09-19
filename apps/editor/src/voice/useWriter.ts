@@ -38,7 +38,7 @@ export function useWriter() {
       try {
         const steps = scriptSteps(rec, wpm);
         setStage('Reading the screen…');
-        const frames = await captureFrames(video, steps, (done, total) =>
+        const frames = await captureFrames(video, steps, rec.viewport, (done, total) =>
           setStage(`Reading the screen ${done}/${total}…`),
         );
 

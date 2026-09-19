@@ -1,4 +1,4 @@
-import { IDLE_ZOOM, evaluateZoom, planZooms, type DemoRecording } from '@demoforge/core';
+import { IDLE_ZOOM, evaluateZoom, pageRect, planZooms, type DemoRecording } from '@demoforge/core';
 import { describe, expect, it } from 'vitest';
 import { stageGeometry } from '../src/render/geometry.js';
 
@@ -118,5 +118,23 @@ describe('planner -> geometry, end to end', () => {
     const s = stageGeometry(OUT_W, OUT_H, VID_W, VID_H, PAD, evaluateZoom(kfs, 13000));
     expect(s.sw).toBe(VID_W);
     expect(s.toStage(0.5, 0.5)).toEqual(centre());
+  });
+});
+
+describe('stageGeometry on a letterboxed capture', () => {
+  // 1920x999 tab in a 1920x1080 stream: 40.5px bars top and bottom.
+  const page = pageRect({ w: 1920, h: 999, dpr: 1 }, 1920, 1080);
+
+  it('draws only the page, never the bars', () => {
+    const s = stageGeometry(1920, 1080, 1920, 1080, 0, IDLE_ZOOM, page);
+    expect([s.sx, s.sy, s.sw, s.sh]).toEqual([0, 40.5, 1920, 999]);
+  });
+
+  it('puts a zoom target dead centre even near the top edge', () => {
+    const z = { scale: 2, xNorm: 0.5, yNorm: 0.3 };
+    const s = stageGeometry(1920, 1080, 1920, 1080, 0, z, page);
+    const p = s.toStage(z.xNorm, z.yNorm);
+    expect(p.x).toBeCloseTo(960, 6);
+    expect(p.y).toBeCloseTo(s.dy + s.dh / 2, 6);
   });
 });

@@ -4,7 +4,7 @@
  * testable, and it is the ONE place 0..1 becomes pixels.
  */
 
-import type { ZoomState } from '@demoforge/core';
+import type { PageRect, ZoomState } from '@demoforge/core';
 
 export interface Stage {
   /** Destination rect of the video on the output canvas, in output px. */
@@ -33,22 +33,30 @@ export function stageGeometry(
   videoH: number,
   padding: number,
   zoom: ZoomState,
+  /**
+   * The page inside the video, in video px (see core's pageRect). Normalised
+   * coordinates are relative to it, and only it is drawn — letterbox bars
+   * never reach the output.
+   */
+  page: PageRect = { x: 0, y: 0, w: videoW, h: videoH },
 ): Stage {
-  // Fit the video inside the padded box, preserving its aspect ratio.
+  const { x: px, y: py, w: pw, h: ph } = page;
+
+  // Fit the page inside the padded box, preserving its aspect ratio.
   const pad = Math.min(outW, outH) * padding;
-  const fit = Math.min((outW - pad * 2) / videoW, (outH - pad * 2) / videoH);
-  const dw = videoW * fit;
-  const dh = videoH * fit;
+  const fit = Math.min((outW - pad * 2) / pw, (outH - pad * 2) / ph);
+  const dw = pw * fit;
+  const dh = ph * fit;
   const dx = (outW - dw) / 2;
   const dy = (outH - dh) / 2;
 
   // Zoom by cropping the source rect. The planner already clamped the target
   // in normalised space, but the decoded video's aspect can differ from the
   // capture viewport, so clamp again against real pixels.
-  const sw = videoW / zoom.scale;
-  const sh = videoH / zoom.scale;
-  const sx = clamp(zoom.xNorm * videoW - sw / 2, 0, videoW - sw);
-  const sy = clamp(zoom.yNorm * videoH - sh / 2, 0, videoH - sh);
+  const sw = pw / zoom.scale;
+  const sh = ph / zoom.scale;
+  const sx = px + clamp(zoom.xNorm * pw - sw / 2, 0, pw - sw);
+  const sy = py + clamp(zoom.yNorm * ph - sh / 2, 0, ph - sh);
 
   return {
     dx,
@@ -61,8 +69,8 @@ export function stageGeometry(
     sh,
     pxScale: dw / sw,
     toStage: (xNorm, yNorm) => ({
-      x: dx + ((xNorm * videoW - sx) / sw) * dw,
-      y: dy + ((yNorm * videoH - sy) / sh) * dh,
+      x: dx + ((px + xNorm * pw - sx) / sw) * dw,
+      y: dy + ((py + yNorm * ph - sy) / sh) * dh,
     }),
   };
 }

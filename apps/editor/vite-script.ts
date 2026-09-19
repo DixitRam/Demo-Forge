@@ -78,7 +78,8 @@ Rules:
 - Use the last step for a closing line if there is room for one.
 - Plain spoken English. No markdown, no stage directions, no emoji, no
   "in this video". Expand symbols and abbreviations into what a person would
-  say aloud.
+  say aloud ("P M ten", not "PM10"). Budgets count the words as spoken, so
+  an expansion spends budget.
 - Do not invent features, numbers or names that are not on screen.`;
 
 const SCHEMA = {

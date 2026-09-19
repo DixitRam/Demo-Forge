@@ -2,14 +2,15 @@
  * The compositor. Both the live preview and the MP4 exporter call this, so
  * what you see is exactly what gets encoded.
  *
- * It converts against the video's real decoded size, never against
- * `rec.viewport`, which can differ from what tabCapture actually produced.
+ * It converts against the video's real decoded size. `rec.viewport` is used
+ * only for its aspect, to find the page inside tabCapture's letterbox.
  * All the arithmetic lives in geometry.ts, where it is unit-tested.
  */
 
 import {
   cursorAt,
   evaluateZoom,
+  pageRect,
   type CaptionCue,
   type DemoRecording,
   type ZoomKeyframe,
@@ -44,7 +45,7 @@ export function compose(
   if (!vw || !vh) return null;
 
   const zoom = evaluateZoom(o.keyframes, o.t);
-  const stage = stageGeometry(w, h, vw, vh, o.style.padding, zoom);
+  const stage = stageGeometry(w, h, vw, vh, o.style.padding, zoom, pageRect(o.rec.viewport, vw, vh));
   const u = unit(w, h);
   const radius = o.style.radius * u;
 

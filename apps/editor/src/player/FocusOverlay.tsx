@@ -1,4 +1,4 @@
-import { IDLE_ZOOM, type ZoomKeyframe } from '@demoforge/core';
+import { IDLE_ZOOM, pageRect, type DemoViewport, type ZoomKeyframe } from '@demoforge/core';
 import { useRef } from 'react';
 import { focusBounds, focusRect, stageGeometry } from '../render/geometry.js';
 import type { FrameStyle } from '../render/style.js';
@@ -10,6 +10,7 @@ interface Props {
   canvasH: number;
   videoW: number;
   videoH: number;
+  viewport: DemoViewport;
   style: FrameStyle;
   onPlace: (xNorm: number, yNorm: number) => void;
 }
@@ -30,6 +31,7 @@ export default function FocusOverlay({
   canvasH,
   videoW,
   videoH,
+  viewport,
   style,
   onPlace,
 }: Props) {
@@ -37,7 +39,15 @@ export default function FocusOverlay({
 
   // Where the unzoomed video sits on the canvas — the same maths the
   // compositor uses, so the overlay cannot drift from the picture.
-  const stage = stageGeometry(canvasW, canvasH, videoW, videoH, style.padding, IDLE_ZOOM);
+  const stage = stageGeometry(
+    canvasW,
+    canvasH,
+    videoW,
+    videoH,
+    style.padding,
+    IDLE_ZOOM,
+    pageRect(viewport, videoW, videoH),
+  );
   const pct = (v: number, total: number): string => `${(v / total) * 100}%`;
 
   const place = (clientX: number, clientY: number): void => {

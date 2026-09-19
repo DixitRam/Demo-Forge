@@ -171,6 +171,7 @@ export default function App() {
                       canvasH={h}
                       videoW={project.video.videoWidth}
                       videoH={project.video.videoHeight}
+                      viewport={project.rec.viewport}
                       style={style}
                       onPlace={(x, y) => setKeyframes(setTarget(keyframes, aimIndex, x, y))}
                     />

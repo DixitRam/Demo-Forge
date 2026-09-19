@@ -80,3 +80,6 @@ export type {
   ProjectBackground,
   ProjectStyle,
 } from './project.js';
+
+export { pageRect } from './page.js';
+export type { PageRect } from './page.js';
