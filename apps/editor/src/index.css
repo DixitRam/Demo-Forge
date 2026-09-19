@@ -6,5 +6,5 @@ body,
   height: 100%;
 }
 body {
-  @apply bg-slate-950 text-slate-200;
+  @apply bg-zinc-950 text-zinc-200;
 }

@@ -35,15 +35,15 @@ export default function DropZone({ onLoad }: { onLoad: (p: LoadedProject) => voi
           void accept([...e.dataTransfer.files]);
         }}
         className={`flex w-full max-w-xl cursor-pointer flex-col items-center gap-3 rounded-2xl border-2 border-dashed p-16 text-center transition ${
-          over ? 'border-sky-400 bg-sky-400/5' : 'border-slate-700 hover:border-slate-500'
+          over ? 'border-blue-400 bg-blue-400/5' : 'border-zinc-700 hover:border-zinc-500'
         }`}
       >
         <span className="text-lg font-medium">
           {busy ? 'Loading…' : 'Drop demo.json + recording.webm'}
         </span>
-        <span className="text-sm text-slate-400">
+        <span className="text-sm text-zinc-400">
           or click to choose them — reopening a saved project? add its
-          <span className="text-slate-300"> .narration.wav</span> to keep the voiceover
+          <span className="text-zinc-300"> .narration.wav</span> to keep the voiceover
         </span>
         <input
           type="file"

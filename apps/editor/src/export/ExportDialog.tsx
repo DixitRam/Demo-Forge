@@ -67,7 +67,7 @@ export default function ExportDialog({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="ml-auto rounded bg-sky-500 px-3 py-1 text-xs font-medium text-slate-950 hover:bg-sky-400"
+        className="rounded-lg bg-blue-500 px-3.5 py-1.5 text-xs font-medium text-white hover:bg-blue-400"
       >
         Export MP4
       </button>
@@ -78,16 +78,16 @@ export default function ExportDialog({
 
   return (
     <div className="ml-auto flex items-center gap-3 text-xs">
-      <span className="text-slate-500" title="Length after cuts">
+      <span className="text-zinc-500" title="Length after cuts">
         {(editedDuration(cuts, project.rec.video.durationMs) / 1000).toFixed(1)}s
       </span>
-      <label className="flex items-center gap-1 text-slate-400">
+      <label className="flex items-center gap-1 text-zinc-400">
         fps
         <select
           value={fps}
           disabled={busy}
           onChange={(e) => setFps(Number(e.target.value))}
-          className="rounded bg-slate-800 px-1 py-0.5 text-slate-200"
+          className="rounded bg-zinc-800 px-1 py-0.5 text-zinc-200"
         >
           {FPS_CHOICES.map((f) => (
             <option key={f} value={f}>
@@ -98,11 +98,11 @@ export default function ExportDialog({
       </label>
 
       {busy && (
-        <span className="flex items-center gap-2 text-slate-400">
-          <span className="h-1.5 w-32 overflow-hidden rounded bg-slate-800">
+        <span className="flex items-center gap-2 text-zinc-400">
+          <span className="h-1.5 w-32 overflow-hidden rounded bg-zinc-800">
             <span
               style={{ width: `${ratio * 100}%` }}
-              className="block h-full bg-sky-400 transition-[width]"
+              className="block h-full bg-blue-400 transition-[width]"
             />
           </span>
           {stage} {Math.round(ratio * 100)}%
@@ -115,7 +115,7 @@ export default function ExportDialog({
         <a
           href={url}
           download="demo.mp4"
-          className="rounded bg-emerald-500 px-3 py-1 font-medium text-slate-950 hover:bg-emerald-400"
+          className="rounded-lg bg-blue-500 px-3 py-1.5 font-medium text-white hover:bg-blue-400"
         >
           Download demo.mp4
         </a>
@@ -124,14 +124,14 @@ export default function ExportDialog({
       {busy ? (
         <button
           onClick={() => abort.current?.abort()}
-          className="rounded bg-slate-800 px-3 py-1 text-slate-200 hover:bg-slate-700"
+          className="rounded bg-zinc-800 px-3 py-1 text-zinc-200 hover:bg-zinc-700"
         >
           Cancel
         </button>
       ) : (
         <button
           onClick={() => void run()}
-          className="rounded bg-sky-500 px-3 py-1 font-medium text-slate-950 hover:bg-sky-400"
+          className="rounded bg-blue-500 px-3 py-1 font-medium text-white hover:bg-blue-400"
         >
           {url ? 'Render again' : 'Render'}
         </button>

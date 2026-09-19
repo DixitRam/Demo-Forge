@@ -42,7 +42,7 @@ export default function CursorPanel({
         />
       </Section>
 
-      <p className="text-[11px] leading-relaxed text-slate-500">
+      <p className="text-[11px] leading-relaxed text-zinc-500">
         This cursor is drawn from the click log, not captured from the screen. That is what will
         let a Playwright-driven recording — which never moves a real pointer — get correct cursor
         motion for free.

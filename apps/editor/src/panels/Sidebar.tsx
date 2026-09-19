@@ -73,15 +73,15 @@ export default function Sidebar(p: Props) {
   const selLine = p.selection?.kind === 'script' ? p.selection.index : null;
 
   return (
-    <div className="flex min-h-0">
+    <div className="flex min-h-0 overflow-hidden rounded-2xl bg-zinc-900 ring-1 ring-white/5">
       {active && (
-        <aside className="flex w-72 shrink-0 flex-col overflow-y-auto border-l border-slate-800 bg-slate-950/60 text-xs">
-          <header className="sticky top-0 flex items-center justify-between border-b border-slate-800 bg-slate-950/90 px-4 py-3 backdrop-blur">
-            <h2 className="text-sm font-semibold text-slate-100">{active.title}</h2>
+        <aside className="flex w-72 shrink-0 flex-col overflow-y-auto text-xs">
+          <header className="sticky top-0 z-10 flex items-center justify-between bg-zinc-900 px-4 pt-4 pb-3">
+            <h2 className="text-sm font-semibold text-zinc-100">{active.title}</h2>
             <button
               onClick={() => setOpen(null)}
               title="Collapse panel"
-              className="rounded px-1.5 text-slate-500 hover:bg-slate-800 hover:text-slate-200"
+              className="rounded px-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
             >
               ›
             </button>
@@ -143,16 +143,16 @@ export default function Sidebar(p: Props) {
         </aside>
       )}
 
-      <nav className="flex w-12 shrink-0 flex-col items-center gap-1 border-l border-slate-800 bg-slate-950 py-3">
+      <nav className="flex w-14 shrink-0 flex-col items-center gap-1.5 border-l border-white/5 py-3">
         {TABS.map((t) => (
           <button
             key={t.id}
             title={t.title}
             onClick={() => setOpen(open === t.id ? null : t.id)}
-            className={`flex h-9 w-9 items-center justify-center rounded-lg transition ${
+            className={`flex h-10 w-10 items-center justify-center rounded-xl transition ${
               open === t.id
-                ? 'bg-sky-500/20 text-sky-300'
-                : 'text-slate-500 hover:bg-slate-800 hover:text-slate-200'
+                ? 'bg-blue-500/15 text-blue-400'
+                : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-200'
             }`}
           >
             {t.icon}

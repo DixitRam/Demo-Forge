@@ -119,10 +119,10 @@ export default function App() {
   const preview = aimIndex === null ? active : [];
 
   return (
-    <div className="flex h-full flex-col bg-slate-950">
-      <header className="flex items-center gap-3 border-b border-slate-800 px-4 py-2">
-        <h1 className="text-sm font-semibold">DemoForge</h1>
-        <span className="text-xs text-slate-500">
+    <div className="flex h-full flex-col gap-2 bg-zinc-950 p-2">
+      <header className="flex items-center gap-3 px-2 pt-1">
+        <h1 className="text-sm font-semibold tracking-tight text-white">DemoForge</h1>
+        <span className="text-xs text-zinc-500">
           {project.rec.events.length} events · {keyframes.length} zooms · {captions.length}{' '}
           captions
           {cuts.length > 0 && (
@@ -138,7 +138,7 @@ export default function App() {
         <button
           onClick={() => save(voice.narration)}
           title="Save project (S) — JSON you can edit by hand or with a script, plus the narration"
-          className="ml-auto rounded bg-slate-800 px-3 py-1 text-xs text-slate-200 hover:bg-slate-700"
+          className="ml-auto rounded-lg px-3 py-1.5 text-xs text-zinc-300 ring-1 ring-white/10 hover:bg-zinc-800 hover:text-white"
         >
           Save project
         </button>
@@ -152,8 +152,9 @@ export default function App() {
         />
       </header>
 
-      <div className="flex min-h-0 flex-1">
-        <main className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[radial-gradient(ellipse_at_top,theme(colors.slate.900),theme(colors.slate.950))] p-6">
+      <div className="flex min-h-0 flex-1 gap-2">
+        <main className="relative flex min-h-0 flex-1 flex-col items-center gap-4 overflow-hidden rounded-2xl bg-zinc-900 ring-1 ring-white/5 p-6 pb-4">
+          <div className="flex min-h-0 w-full flex-1 items-center justify-center">
           <Player
             project={project}
             keyframes={preview}
@@ -177,6 +178,14 @@ export default function App() {
                     />
                   )
             }
+          />
+          </div>
+          <Transport
+            video={project.video}
+            timeMs={timeMs}
+            durationMs={duration}
+            style={style}
+            setStyle={setStyle}
           />
           {selection?.kind === 'cut' && selection.index < cuts.length && (
             <CutInspector
@@ -243,14 +252,7 @@ export default function App() {
         />
       </div>
 
-      <footer className="border-t border-slate-800 bg-slate-950">
-        <Transport
-          video={project.video}
-          timeMs={timeMs}
-          durationMs={duration}
-          style={style}
-          setStyle={setStyle}
-        />
+      <footer className="rounded-2xl bg-zinc-900 ring-1 ring-white/5 pb-2">
         <Timeline
           rec={project.rec}
           keyframes={keyframes}

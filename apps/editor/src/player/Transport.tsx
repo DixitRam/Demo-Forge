@@ -39,7 +39,7 @@ function Btn({
     <button
       onClick={onClick}
       title={title}
-      className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-zinc-500 hover:bg-white/5 hover:text-zinc-100"
     >
       {children}
     </button>
@@ -63,20 +63,20 @@ export default function Transport({ video, timeMs, durationMs, style, setStyle }
   };
 
   return (
-    <div className="flex items-center gap-2 border-b border-slate-800 px-4 py-2">
+    <div className="flex w-full max-w-3xl shrink-0 items-center gap-1.5 rounded-full bg-zinc-950/80 py-1.5 pr-2 pl-1.5 ring-1 ring-white/10">
+      <button
+        onClick={() => (video.paused ? void video.play() : video.pause())}
+        title="Play / pause (Space)"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-zinc-950 hover:bg-zinc-200"
+      >
+        {playing ? <IconPause /> : <IconPlay />}
+      </button>
       <Btn onClick={() => seek(0)} title="Start (Home)">
         <IconStart />
       </Btn>
       <Btn onClick={() => seek(timeMs - STEP_MS)} title="Back one frame (←)">
         <IconStepBack />
       </Btn>
-      <button
-        onClick={() => (video.paused ? void video.play() : video.pause())}
-        title="Play / pause (Space)"
-        className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-500 text-slate-950 hover:bg-sky-400"
-      >
-        {playing ? <IconPause /> : <IconPlay />}
-      </button>
       <Btn onClick={() => seek(timeMs + STEP_MS)} title="Forward one frame (→)">
         <IconStepFwd />
       </Btn>
@@ -84,8 +84,8 @@ export default function Transport({ video, timeMs, durationMs, style, setStyle }
         <IconEnd />
       </Btn>
 
-      <span className="ml-1 font-mono text-xs whitespace-nowrap text-slate-300">
-        {fmt(timeMs)} <span className="text-slate-600">/ {fmt(durationMs)}</span>
+      <span className="ml-1 font-mono text-xs whitespace-nowrap text-zinc-300">
+        {fmt(timeMs)} <span className="text-zinc-600">/ {fmt(durationMs)}</span>
       </span>
 
       <input
@@ -95,7 +95,7 @@ export default function Transport({ video, timeMs, durationMs, style, setStyle }
         step={10}
         value={Math.min(timeMs, durationMs)}
         onChange={(e) => seek(Number(e.target.value))}
-        className="mx-2 min-w-0 flex-1 accent-sky-400"
+        className="mx-2 min-w-0 flex-1 accent-blue-500"
       />
 
       <select
@@ -104,7 +104,7 @@ export default function Transport({ video, timeMs, durationMs, style, setStyle }
           setStyle({ ...style, aspect: e.target.value === 'null' ? null : Number(e.target.value) })
         }
         title="Aspect ratio"
-        className="rounded-md bg-slate-800 px-2 py-1 text-xs text-slate-200"
+        className="rounded-full bg-zinc-800/80 px-2.5 py-1 text-xs text-zinc-200 outline-none hover:bg-zinc-700"
       >
         {ASPECT_PRESETS.map((p) => (
           <option key={p.label} value={p.value === null ? 'null' : String(p.value)}>

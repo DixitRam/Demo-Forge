@@ -5,27 +5,29 @@ export type DragMode = 'move' | 'start' | 'end';
 
 /** Below this a pill cannot hold two handles and a draggable body. */
 const COMPACT_PX = 34;
+/** Room for the second line — the time range — under the label. */
+const TWO_LINE_PX = 76;
 
 const TONES = {
   zoom: {
-    on: 'border-sky-300 bg-sky-500/40 text-sky-50 ring-1 ring-sky-300/60',
-    off: 'border-sky-500/50 bg-sky-500/20 text-sky-200 hover:bg-sky-500/30',
-    grip: 'bg-sky-300/70',
+    on: 'border-blue-300 bg-blue-500/45 text-white ring-2 ring-blue-300/50',
+    off: 'border-blue-500/40 bg-blue-500/25 text-blue-50 hover:bg-blue-500/35',
+    grip: 'bg-blue-400',
   },
   cut: {
-    on: 'border-red-300 bg-red-500/40 text-red-50 ring-1 ring-red-300/60',
-    off: 'border-red-500/50 bg-red-500/20 text-red-200 hover:bg-red-500/30',
-    grip: 'bg-red-300/70',
+    on: 'border-red-300 bg-red-500/45 text-white ring-2 ring-red-300/50',
+    off: 'border-red-500/40 bg-red-500/25 text-red-50 hover:bg-red-500/35',
+    grip: 'bg-red-400',
   },
   voice: {
-    on: 'border-violet-300 bg-violet-500/40 text-violet-50 ring-1 ring-violet-300/60',
-    off: 'border-violet-500/50 bg-violet-500/20 text-violet-200 hover:bg-violet-500/30',
-    grip: 'bg-violet-300/70',
+    on: 'border-violet-300 bg-violet-500/45 text-white ring-2 ring-violet-300/50',
+    off: 'border-violet-500/40 bg-violet-500/25 text-violet-50 hover:bg-violet-500/35',
+    grip: 'bg-violet-400',
   },
   caption: {
-    on: 'border-emerald-300 bg-emerald-500/40 text-emerald-50 ring-1 ring-emerald-300/60',
-    off: 'border-emerald-500/50 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30',
-    grip: 'bg-emerald-300/70',
+    on: 'border-emerald-300 bg-emerald-500/45 text-white ring-2 ring-emerald-300/50',
+    off: 'border-emerald-500/40 bg-emerald-500/25 text-emerald-50 hover:bg-emerald-500/35',
+    grip: 'bg-emerald-400',
   },
 } as const;
 
@@ -37,6 +39,8 @@ interface Props {
   selected: boolean;
   title: string;
   label: ReactNode;
+  /** Second line, shown when the pill is wide enough — a time range, say. */
+  sub?: string;
   onSelect: () => void;
   onDrag: (mode: DragMode, deltaMs: number) => void;
   onDragEnd: () => void;
@@ -52,6 +56,7 @@ export default function Pill({
   selected,
   title,
   label,
+  sub,
   onSelect,
   onDrag,
   onDragEnd,
@@ -86,25 +91,28 @@ export default function Pill({
       onPointerDown={begin('move')}
       style={{ left: leftPx, width: Math.max(6, widthPx) }}
       title={title}
-      className={`absolute inset-y-1 flex cursor-grab items-center justify-between overflow-hidden rounded-md border text-[10px] font-medium select-none active:cursor-grabbing ${
+      className={`absolute inset-y-1 flex cursor-grab items-center justify-between overflow-hidden rounded-lg border text-[11px] font-medium select-none active:cursor-grabbing ${
         selected ? t.on : t.off
       }`}
     >
       {handles && (
         <span
           onPointerDown={begin('start')}
-          className={`h-full w-1.5 shrink-0 cursor-ew-resize ${t.grip}`}
+          className={`h-full w-1.5 shrink-0 cursor-ew-resize rounded-sm ${t.grip}`}
         />
       )}
       {widthPx >= COMPACT_PX && (
-        <span className="pointer-events-none flex min-w-0 items-center gap-1 truncate px-1">
-          {label}
+        <span className="pointer-events-none flex min-w-0 flex-1 flex-col items-center px-1 leading-tight">
+          <span className="flex max-w-full items-center gap-1 truncate">{label}</span>
+          {sub && widthPx >= TWO_LINE_PX && (
+            <span className="max-w-full truncate text-[9px] font-normal opacity-60">{sub}</span>
+          )}
         </span>
       )}
       {handles && (
         <span
           onPointerDown={begin('end')}
-          className={`h-full w-1.5 shrink-0 cursor-ew-resize ${t.grip}`}
+          className={`h-full w-1.5 shrink-0 cursor-ew-resize rounded-sm ${t.grip}`}
         />
       )}
     </div>

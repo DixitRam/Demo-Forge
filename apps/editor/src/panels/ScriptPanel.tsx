@@ -69,17 +69,17 @@ function ProviderQuota({
   return (
     <div className="flex flex-col gap-1">
       <span className="flex justify-between text-[10px]">
-        <span className="text-slate-400">{left.toLocaleString()} characters left</span>
+        <span className="text-zinc-400">{left.toLocaleString()} characters left</span>
         {pending > 0 && (
-          <span className={short ? 'text-red-400' : 'text-slate-500'}>
+          <span className={short ? 'text-red-400' : 'text-zinc-500'}>
             this run: {pending.toLocaleString()}
           </span>
         )}
       </span>
-      <span className="h-1 overflow-hidden rounded bg-slate-800">
+      <span className="h-1 overflow-hidden rounded bg-zinc-800">
         <span
           style={{ width: `${Math.min(100, (quota.used / Math.max(1, quota.limit)) * 100)}%` }}
-          className="block h-full bg-sky-400"
+          className="block h-full bg-blue-400"
         />
       </span>
       {short && (
@@ -108,7 +108,7 @@ export default function ScriptPanel(p: Props) {
     <div className="flex flex-col gap-5">
       <Section label="Voice">
         {p.providers && (
-          <div className="flex flex-wrap gap-1 rounded-lg bg-slate-900 p-1">
+          <div className="flex flex-wrap gap-1 rounded-lg bg-zinc-900 p-1">
             {p.providers.map((x) => (
               <button
                 key={x.id}
@@ -118,8 +118,8 @@ export default function ScriptPanel(p: Props) {
                 title={x.ok ? x.label : x.error}
                 className={`min-w-[30%] flex-1 rounded-md px-2 py-1 text-[10px] transition ${
                   v.provider === x.id
-                    ? 'bg-emerald-500/90 font-medium text-slate-950'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-blue-500 font-medium text-white'
+                    : 'text-zinc-400 hover:text-zinc-200'
                 } ${x.ok ? '' : 'opacity-60'}`}
               >
                 {x.label}
@@ -137,14 +137,14 @@ export default function ScriptPanel(p: Props) {
               .reduce((n, l) => n + l.text.trim().length, 0)}
           />
         )}
-        {provider?.note && <p className="text-[10px] leading-relaxed text-slate-500">{provider.note}</p>}
+        {provider?.note && <p className="text-[10px] leading-relaxed text-zinc-500">{provider.note}</p>}
 
         <label className="flex flex-col gap-1">
-          <span className="text-slate-400">Voice</span>
+          <span className="text-zinc-400">Voice</span>
           <select
             value={v.voice}
             onChange={(e) => setV({ voice: e.target.value })}
-            className="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-slate-100 outline-none focus:border-sky-500"
+            className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-zinc-100 outline-none focus:border-blue-500"
           >
             {voices.map((o) => (
               <option key={o.id} value={o.id}>
@@ -169,12 +169,12 @@ export default function ScriptPanel(p: Props) {
 
         {provider?.direction && (
           <label className="flex flex-col gap-1">
-            <span className="flex items-center justify-between text-slate-400">
+            <span className="flex items-center justify-between text-zinc-400">
               How to read it
               <select
                 value=""
                 onChange={(e) => e.target.value && setV({ direction: e.target.value })}
-                className="rounded bg-slate-800 px-1 py-0.5 text-[10px] text-slate-300"
+                className="rounded bg-zinc-800 px-1 py-0.5 text-[10px] text-zinc-300"
               >
                 <option value="">presets…</option>
                 {DIRECTIONS.map((d, i) => (
@@ -189,7 +189,7 @@ export default function ScriptPanel(p: Props) {
               rows={3}
               placeholder="Tone, pace, accent — handed to the model with the line."
               onChange={(e) => setV({ direction: e.target.value })}
-              className="w-full resize-none rounded-lg border border-slate-700 bg-slate-900 p-2 text-[11px] leading-relaxed text-slate-100 outline-none focus:border-sky-500"
+              className="w-full resize-none rounded-lg border border-zinc-700 bg-zinc-900 p-2 text-[11px] leading-relaxed text-zinc-100 outline-none focus:border-blue-500"
             />
           </label>
         )}
@@ -216,13 +216,13 @@ export default function ScriptPanel(p: Props) {
 
       <Section label="Script">
         <label className="flex flex-col gap-1">
-          <span className="text-slate-400">What is this demo about?</span>
+          <span className="text-zinc-400">What is this demo about?</span>
           <textarea
             value={p.brief}
             rows={2}
             placeholder="The product, the audience, what you want them to take away. Optional, but it is the difference between a decent script and a good one."
             onChange={(e) => p.setBrief(e.target.value)}
-            className="w-full resize-none rounded-lg border border-slate-700 bg-slate-900 p-2 text-[11px] leading-relaxed text-slate-100 outline-none focus:border-sky-500"
+            className="w-full resize-none rounded-lg border border-zinc-700 bg-zinc-900 p-2 text-[11px] leading-relaxed text-zinc-100 outline-none focus:border-blue-500"
           />
         </label>
 
@@ -230,7 +230,7 @@ export default function ScriptPanel(p: Props) {
           onClick={p.onWrite}
           disabled={p.writing !== null || p.writer?.ok === false}
           title="Sends a frame of each step, with the click marked, to a model that writes to the time available"
-          className="rounded-lg bg-violet-500/90 py-2 font-medium text-slate-950 hover:bg-violet-400 disabled:opacity-40"
+          className="rounded-lg bg-violet-500/90 py-2 font-medium text-white hover:bg-violet-400 disabled:opacity-40"
         >
           {p.writing ?? '✧ Write the script with AI'}
         </button>
@@ -252,7 +252,7 @@ export default function ScriptPanel(p: Props) {
               p.onSelect(null);
             }}
             title="A rough draft from the element text already in the log — no AI, no network"
-            className="flex-1 rounded-lg bg-slate-800 py-2 text-slate-200 hover:bg-slate-700"
+            className="flex-1 rounded-lg bg-zinc-800 py-2 text-zinc-200 hover:bg-zinc-700"
           >
             From clicks
           </button>
@@ -262,7 +262,7 @@ export default function ScriptPanel(p: Props) {
               p.setScript(next);
               p.onSelect(next.findIndex((l) => l.tStart === Math.min(Math.max(0, p.timeMs), duration)));
             }}
-            className="flex-1 rounded-lg bg-slate-800 py-2 text-slate-200 hover:bg-slate-700"
+            className="flex-1 rounded-lg bg-zinc-800 py-2 text-zinc-200 hover:bg-zinc-700"
           >
             + At playhead
           </button>
@@ -271,7 +271,7 @@ export default function ScriptPanel(p: Props) {
         <button
           onClick={p.onGenerate}
           disabled={busy || p.script.length === 0 || provider?.ok === false}
-          className="rounded-lg bg-sky-500/90 py-2 font-medium text-slate-950 hover:bg-sky-400 disabled:opacity-40"
+          className="rounded-lg bg-blue-500/90 py-2 font-medium text-white hover:bg-blue-400 disabled:opacity-40"
         >
           {busy
             ? (p.progress!.note ?? `Speaking ${p.progress!.done + 1}/${p.progress!.total}…`)
@@ -281,7 +281,7 @@ export default function ScriptPanel(p: Props) {
         </button>
 
         {p.hasNarration && !busy && (
-          <p className="text-[11px] leading-relaxed text-slate-500">
+          <p className="text-[11px] leading-relaxed text-zinc-500">
             Voiceover ready — it plays in the preview and is muxed into the export, with the
             recording ducked underneath.
           </p>
@@ -310,7 +310,7 @@ export default function ScriptPanel(p: Props) {
           </button>
         )}
         {p.script.length === 0 && (
-          <p className="text-[11px] leading-relaxed text-slate-500">
+          <p className="text-[11px] leading-relaxed text-zinc-500">
             No narration yet. Write it with AI — it looks at a frame of every step — or draft
             something rough “From clicks”. Edit the words, then generate the voiceover.
           </p>
@@ -325,19 +325,19 @@ export default function ScriptPanel(p: Props) {
               onPointerDown={() => p.onSelect(i)}
               className={`rounded-lg border p-2 transition ${
                 p.selected === i
-                  ? 'border-sky-500/70 bg-sky-500/5'
-                  : 'border-slate-800 hover:border-slate-700'
+                  ? 'border-blue-500/70 bg-blue-500/5'
+                  : 'border-zinc-800 hover:border-zinc-700'
               }`}
             >
               <div className="mb-1 flex items-center gap-2 text-[10px]">
                 <button
                   onClick={() => p.onSeek(line.tStart)}
                   title="Jump here"
-                  className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-slate-300 hover:bg-slate-700"
+                  className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-zinc-300 hover:bg-zinc-700"
                 >
                   {stamp(line.tStart)}
                 </button>
-                <span className={overruns.has(i) ? 'text-amber-400' : 'text-slate-600'}>
+                <span className={overruns.has(i) ? 'text-amber-400' : 'text-zinc-600'}>
                   {(lineDuration(line, v.rate) / 1000).toFixed(1)}s
                   {line.audioMs === undefined && ' est.'}
                 </span>
@@ -346,7 +346,7 @@ export default function ScriptPanel(p: Props) {
                     p.setScript(deleteLine(p.script, i));
                     p.onSelect(null);
                   }}
-                  className="ml-auto rounded px-1 text-slate-600 hover:bg-slate-800 hover:text-red-300"
+                  className="ml-auto rounded px-1 text-zinc-600 hover:bg-zinc-800 hover:text-red-300"
                   title="Delete line"
                 >
                   ✕
@@ -356,7 +356,7 @@ export default function ScriptPanel(p: Props) {
                 value={line.text}
                 rows={Math.min(6, Math.ceil(line.text.length / 34) || 1)}
                 onChange={(e) => p.setScript(setLineText(p.script, i, e.target.value))}
-                className="w-full resize-none bg-transparent text-[11px] leading-relaxed text-slate-200 outline-none"
+                className="w-full resize-none bg-transparent text-[11px] leading-relaxed text-zinc-200 outline-none"
               />
             </div>
           ))}

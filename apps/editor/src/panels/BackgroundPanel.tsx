@@ -36,7 +36,7 @@ export default function BackgroundPanel({
 
       {tab === 'image' && (
         <>
-          <label className="cursor-pointer rounded-lg border border-slate-700 py-2 text-center text-slate-300 hover:border-slate-500 hover:text-white">
+          <label className="cursor-pointer rounded-lg border border-zinc-700 py-2 text-center text-zinc-300 hover:border-zinc-500 hover:text-white">
             Upload Custom
             <input
               type="file"
@@ -46,7 +46,7 @@ export default function BackgroundPanel({
             />
           </label>
           {bg.kind === 'image' && (
-            <div className="overflow-hidden rounded-md border-2 border-sky-400">
+            <div className="overflow-hidden rounded-md border-2 border-blue-400">
               <img src={bg.src} alt="" className="h-16 w-full object-cover" />
             </div>
           )}
@@ -58,8 +58,8 @@ export default function BackgroundPanel({
                 onClick={() => setBg({ kind: 'wallpaper', id: wp.id })}
                 className={`aspect-[3/2] overflow-hidden rounded-md border-2 transition ${
                   bg.kind === 'wallpaper' && bg.id === wp.id
-                    ? 'border-sky-400'
-                    : 'border-transparent hover:border-slate-600'
+                    ? 'border-blue-400'
+                    : 'border-transparent hover:border-zinc-600'
                 }`}
               >
                 <img src={wallpaperThumb(wp)} alt={wp.name} className="h-full w-full" />
@@ -76,9 +76,9 @@ export default function BackgroundPanel({
               type="color"
               value={bg.kind === 'solid' ? bg.color : '#0f172a'}
               onChange={(e) => setBg({ kind: 'solid', color: e.target.value })}
-              className="h-9 w-14 rounded border border-slate-700 bg-transparent"
+              className="h-9 w-14 rounded border border-zinc-700 bg-transparent"
             />
-            <span className="font-mono text-slate-400">
+            <span className="font-mono text-zinc-400">
               {bg.kind === 'solid' ? bg.color : 'pick a colour'}
             </span>
           </div>
@@ -94,26 +94,26 @@ export default function BackgroundPanel({
                 title={p.name}
                 onClick={() => setBg({ ...p, kind: 'gradient' })}
                 style={{ background: `linear-gradient(${p.angle}deg, ${p.from}, ${p.to})` }}
-                className="h-8 rounded border border-slate-700 hover:border-slate-500"
+                className="h-8 rounded border border-zinc-700 hover:border-zinc-500"
               />
             ))}
           </div>
           {bg.kind === 'gradient' && (
             <>
-              <div className="flex items-center justify-between text-slate-400">
+              <div className="flex items-center justify-between text-zinc-400">
                 <span>From / to</span>
                 <span className="flex gap-1">
                   <input
                     type="color"
                     value={bg.from}
                     onChange={(e) => setBg({ ...bg, from: e.target.value })}
-                    className="h-8 w-11 rounded border border-slate-700 bg-transparent"
+                    className="h-8 w-11 rounded border border-zinc-700 bg-transparent"
                   />
                   <input
                     type="color"
                     value={bg.to}
                     onChange={(e) => setBg({ ...bg, to: e.target.value })}
-                    className="h-8 w-11 rounded border border-slate-700 bg-transparent"
+                    className="h-8 w-11 rounded border border-zinc-700 bg-transparent"
                   />
                 </span>
               </div>

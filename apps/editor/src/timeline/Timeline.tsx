@@ -13,6 +13,14 @@ import { captionSlotAt, insertCaption, moveCaption } from './captionOps.js';
 import { applyDrag, freeSlotAt, insertZoom, snapWithin, type DragMode } from './kfOps.js';
 import { insertLine, moveLine } from './scriptOps.js';
 import Pill from './Pill.js';
+import {
+  IconCaption,
+  IconFit,
+  IconScissors,
+  IconScript,
+  IconTrash,
+  IconZoom,
+} from '../panels/icons.js';
 import { fullView, panView, revealTime, zoomView, type View } from './view.js';
 
 export type Selection = { kind: 'zoom' | 'caption' | 'cut' | 'script'; index: number } | null;
@@ -25,6 +33,14 @@ const LANE_LABEL_W = 62;
 /** A fresh cut is this long; drag its edges from there. */
 const DEFAULT_CUT_MS = 2000;
 const MIN_VISIBLE_CUT_MS = 200;
+
+const BTN =
+  'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-zinc-300 hover:bg-white/5 hover:text-white disabled:pointer-events-none disabled:opacity-35';
+const KBD = 'rounded bg-zinc-800 px-1 font-mono text-[10px] text-zinc-500';
+const LANE = 'relative h-11 border-b border-white/5';
+
+/** "1.2s – 4.6s": the second line on a pill. */
+const rangeLabel = (a: number, b: number): string => `${(a / 1000).toFixed(1)}s – ${(b / 1000).toFixed(1)}s`;
 
 interface Props {
   rec: DemoRecording;
@@ -265,20 +281,20 @@ export default function Timeline({
 
   return (
     <div className="select-none">
-      <div className="flex items-center gap-2 px-4 py-1.5 text-[11px] text-slate-500">
+      <div className="flex items-center gap-1 border-b border-white/5 px-3 py-2 text-xs text-zinc-500">
         <button
           onClick={() => addZoomAt(timeMs)}
           disabled={!canAddZoom}
-          className="rounded bg-slate-800 px-2 py-0.5 text-slate-200 hover:bg-slate-700 disabled:opacity-40"
+          className={BTN}
         >
-          + Zoom <kbd className="text-slate-500">Z</kbd>
+          <IconZoom /> Zoom <kbd className={KBD}>Z</kbd>
         </button>
         <button
           onClick={() => addCaptionAt(timeMs)}
           disabled={!canAddCaption}
-          className="rounded bg-slate-800 px-2 py-0.5 text-slate-200 hover:bg-slate-700 disabled:opacity-40"
+          className={BTN}
         >
-          + Caption <kbd className="text-slate-500">C</kbd>
+          <IconCaption /> Caption <kbd className={KBD}>C</kbd>
         </button>
         <button
           onClick={() => {
@@ -295,47 +311,47 @@ export default function Timeline({
             onSelect(null);
           }}
           disabled={!selection}
-          className="rounded bg-slate-800 px-2 py-0.5 text-slate-200 hover:bg-slate-700 disabled:opacity-40"
+          className={BTN}
         >
-          Delete
+          <IconTrash /> Delete
         </button>
         <button
           onClick={() => addLineAt(timeMs)}
-          className="rounded bg-slate-800 px-2 py-0.5 text-slate-200 hover:bg-slate-700"
+          className={BTN}
         >
-          + Line <kbd className="text-slate-500">N</kbd>
+          <IconScript /> Line <kbd className={KBD}>N</kbd>
         </button>
         <button
           onClick={() => addCutAt(timeMs)}
           disabled={!canAddCut}
-          className="rounded bg-slate-800 px-2 py-0.5 text-slate-200 hover:bg-slate-700 disabled:opacity-40"
+          className={BTN}
         >
-          + Cut <kbd className="text-slate-500">T</kbd>
+          <IconScissors /> Cut <kbd className={KBD}>T</kbd>
         </button>
         <button
           onClick={() => setView(fullView(duration))}
-          className="rounded bg-slate-800 px-2 py-0.5 text-slate-200 hover:bg-slate-700"
+          className={BTN}
         >
-          Fit
+          <IconFit /> Fit
         </button>
         {cuts.length > 0 && (
           <span className="text-red-300/80">
             {(cutDuration(cuts) / 1000).toFixed(1)}s cut
           </span>
         )}
-        <span className="ml-auto flex gap-3">
-          <span className="rounded bg-slate-900 px-1.5 py-0.5">Shift+Scroll pan</span>
-          <span className="rounded bg-slate-900 px-1.5 py-0.5">Ctrl+Scroll zoom</span>
+        <span className="ml-auto flex items-center gap-3 text-[11px]">
+          <span><kbd className={KBD}>Shift+Scroll</kbd> pan</span>
+          <span><kbd className={KBD}>Ctrl+Scroll</kbd> zoom</span>
         </span>
       </div>
 
       <div className="flex">
-        <div className="shrink-0 pt-6 pl-4 text-[10px] text-slate-600" style={{ width: LANE_LABEL_W }}>
-          <div className="flex h-8 items-center">cut</div>
-          <div className="flex h-9 items-center">zoom</div>
-          <div className="flex h-8 items-center">caption</div>
-          <div className="flex h-8 items-center">voice</div>
-          <div className="flex h-7 items-center">clip</div>
+        <div className="shrink-0 pt-7 pl-4 text-[11px] text-zinc-500" style={{ width: LANE_LABEL_W }}>
+          {['Cut', 'Zoom', 'Caption', 'Voice', 'Clip'].map((l) => (
+            <div key={l} className="flex h-11 items-center">
+              {l}
+            </div>
+          ))}
         </div>
 
         <div ref={scrollRef} className="relative min-w-0 flex-1 overflow-hidden pr-4">
@@ -348,13 +364,20 @@ export default function Timeline({
             onPointerMove={(e) => {
               if (e.buttons === 1) onSeek(toMs(e.clientX));
             }}
-            className="relative h-6 cursor-ew-resize border-b border-slate-800"
+            className="relative h-7 cursor-ew-resize border-b border-white/5"
           >
             {ticks.map((t) => (
               <div
                 key={t}
                 style={{ left: toPx(t) }}
-                className="absolute bottom-0 h-full border-l border-slate-800 pl-1 text-[10px] leading-6 text-slate-500"
+                className="absolute bottom-0 h-2 border-l border-zinc-700"
+              />
+            ))}
+            {ticks.map((t) => (
+              <div
+                key={`l${t}`}
+                style={{ left: toPx(t) }}
+                className={`absolute top-1 text-[10px] text-zinc-500 tabular-nums ${t > 0 ? "-translate-x-1/2" : "pl-1"}`}
               >
                 {label(t, step < 1000)}
               </div>
@@ -372,7 +395,7 @@ export default function Timeline({
           <div
             onPointerDown={() => onSelect(null)}
             onDoubleClick={(e) => addCutAt(toMs(e.clientX))}
-            className="relative h-8 border-b border-slate-800/60 bg-slate-900/40"
+            className={LANE}
           >
             {cuts.map((cut, i) => {
               const l = toPx(cut.tStart);
@@ -387,7 +410,8 @@ export default function Timeline({
                   pxPerMs={pxPerMs}
                   selected={selCut === i}
                   title={`Skips ${((cut.tEnd - cut.tStart) / 1000).toFixed(1)}s of source`}
-                  label={`${((cut.tEnd - cut.tStart) / 1000).toFixed(1)}s`}
+                  label={`Cut ${((cut.tEnd - cut.tStart) / 1000).toFixed(1)}s`}
+                  sub={rangeLabel(cut.tStart, cut.tEnd)}
                   onSelect={() => onSelect({ kind: 'cut', index: i })}
                   onDrag={(mode, delta) => onCutDrag(i, mode, delta)}
                   onDragEnd={() => {
@@ -397,7 +421,7 @@ export default function Timeline({
               );
             })}
             {cuts.length === 0 && (
-              <span className="pointer-events-none absolute inset-0 grid place-items-center text-[11px] text-slate-600">
+              <span className="pointer-events-none absolute inset-0 grid place-items-center text-[11px] text-zinc-600/80">
                 Press T to cut a section out
               </span>
             )}
@@ -406,7 +430,7 @@ export default function Timeline({
           <div
             onPointerDown={() => onSelect(null)}
             onDoubleClick={(e) => addZoomAt(toMs(e.clientX))}
-            className="relative h-9 border-b border-slate-800/60 bg-slate-900/60"
+            className={LANE}
           >
             {keyframes.map((kf, i) => {
               const l = toPx(kf.tStart);
@@ -421,7 +445,8 @@ export default function Timeline({
                   pxPerMs={pxPerMs}
                   selected={selZoom === i}
                   title={`${(kf.tStart / 1000).toFixed(2)}s – ${(kf.tEnd / 1000).toFixed(2)}s · ${kf.scale.toFixed(2)}×`}
-                  label={`${kf.scale.toFixed(2)}×`}
+                  label={`${kf.scale.toFixed(1)}×`}
+                  sub={rangeLabel(kf.tStart, kf.tEnd)}
                   onSelect={() => onSelect({ kind: 'zoom', index: i })}
                   onDrag={(mode, delta) => onDrag(i, mode, delta)}
                   onDragEnd={() => {
@@ -431,7 +456,7 @@ export default function Timeline({
               );
             })}
             {keyframes.length === 0 && (
-              <span className="pointer-events-none absolute inset-0 grid place-items-center text-[11px] text-slate-600">
+              <span className="pointer-events-none absolute inset-0 grid place-items-center text-[11px] text-zinc-600/80">
                 Press Z to add a zoom
               </span>
             )}
@@ -440,7 +465,7 @@ export default function Timeline({
           <div
             onPointerDown={() => onSelect(null)}
             onDoubleClick={(e) => addCaptionAt(toMs(e.clientX))}
-            className="relative h-8 border-b border-slate-800/60 bg-slate-900/40"
+            className={LANE}
           >
             {captions.map((cue, i) => {
               const l = toPx(cue.tStart);
@@ -456,6 +481,7 @@ export default function Timeline({
                   selected={selCaption === i}
                   title={cue.text}
                   label={cue.text}
+                  sub={rangeLabel(cue.tStart, cue.tEnd)}
                   onSelect={() => onSelect({ kind: 'caption', index: i })}
                   onDrag={(mode, delta) => onCaptionDrag(i, mode, delta)}
                   onDragEnd={() => {
@@ -465,7 +491,7 @@ export default function Timeline({
               );
             })}
             {captions.length === 0 && (
-              <span className="pointer-events-none absolute inset-0 grid place-items-center text-[11px] text-slate-600">
+              <span className="pointer-events-none absolute inset-0 grid place-items-center text-[11px] text-zinc-600/80">
                 Press C to add a caption
               </span>
             )}
@@ -474,7 +500,7 @@ export default function Timeline({
           <div
             onPointerDown={() => onSelect(null)}
             onDoubleClick={(e) => addLineAt(toMs(e.clientX))}
-            className="relative h-8 border-b border-slate-800/60 bg-slate-900/60"
+            className={LANE}
           >
             {script.map((line, i) => {
               const l = toPx(line.tStart);
@@ -500,16 +526,16 @@ export default function Timeline({
               );
             })}
             {script.length === 0 && (
-              <span className="pointer-events-none absolute inset-0 grid place-items-center text-[11px] text-slate-600">
+              <span className="pointer-events-none absolute inset-0 grid place-items-center text-[11px] text-zinc-600/80">
                 Press N to add a narration line
               </span>
             )}
           </div>
 
-          <div className="relative h-7 bg-slate-900/30">
+          <div className="relative h-11">
             <div
               style={{ left: toPx(0), width: duration * pxPerMs }}
-              className="absolute inset-y-1 flex items-center gap-1.5 overflow-hidden rounded-md border border-slate-700 bg-slate-800/80 px-2 text-[10px] text-slate-300"
+              className="absolute inset-y-1 flex items-center gap-1.5 overflow-hidden rounded-lg border border-white/10 bg-zinc-800 px-2.5 text-[11px] text-zinc-300"
             >
               <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
               <span className="truncate">{mediaName}</span>
@@ -517,12 +543,12 @@ export default function Timeline({
           </div>
 
           {/* What the export will drop, shaded across every lane. */}
-          <div className="pointer-events-none absolute top-6 right-4 bottom-0 left-0">
+          <div className="pointer-events-none absolute top-7 right-4 bottom-0 left-0">
             {cuts.map((cut, i) => (
               <div
                 key={i}
                 style={{ left: toPx(cut.tStart), width: (cut.tEnd - cut.tStart) * pxPerMs }}
-                className="absolute inset-y-0 border-x border-red-400/40 bg-slate-950/65"
+                className="absolute inset-y-0 border-x border-red-400/40 bg-zinc-950/65"
               />
             ))}
           </div>
@@ -530,9 +556,9 @@ export default function Timeline({
           {/* Playhead spans every lane. */}
           <div
             style={{ left: playheadX }}
-            className="pointer-events-none absolute top-0 bottom-0 w-px bg-sky-300"
+            className="pointer-events-none absolute top-0 bottom-0 w-0.5 -translate-x-1/2 bg-blue-500"
           >
-            <span className="absolute -top-0.5 -left-[5px] h-2.5 w-2.5 rounded-sm bg-sky-300" />
+            <span className="absolute top-0.5 left-1/2 h-3 w-3 -translate-x-1/2 rounded-full bg-blue-500 ring-2 ring-zinc-900" />
           </div>
         </div>
       </div>

@@ -93,10 +93,10 @@ export default function FocusOverlay({
           // obvious way to do this and silently renders nothing in Chrome.
           boxShadow: '0 0 0 9999px rgba(2, 6, 23, 0.6)',
         }}
-        className="pointer-events-none absolute border-2 border-sky-400"
+        className="pointer-events-none absolute border-2 border-blue-400"
       >
-        <span className="absolute top-1/2 left-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-sky-300 bg-sky-400/30" />
-        <span className="absolute -top-6 left-0 rounded bg-sky-400 px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap text-slate-950">
+        <span className="absolute top-1/2 left-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-blue-300 bg-blue-400/30" />
+        <span className="absolute -top-6 left-0 rounded bg-blue-400 px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap text-white">
           {kf.scale.toFixed(2)}× · {kf.focus === 'manual' ? 'manual' : 'auto'}
         </span>
       </div>

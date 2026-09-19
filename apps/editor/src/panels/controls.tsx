@@ -21,9 +21,9 @@ export function Slider({
 }) {
   return (
     <label className={`flex flex-col gap-1 ${disabled ? 'opacity-40' : ''}`}>
-      <span className="flex justify-between text-slate-400">
+      <span className="flex justify-between text-zinc-400">
         <span>{label}</span>
-        <span className="font-mono text-slate-300">
+        <span className="rounded-md bg-zinc-800 px-1.5 py-0.5 font-mono text-[11px] text-zinc-200 tabular-nums">
           {(format ?? ((v: number) => v.toFixed(2)))(value)}
         </span>
       </span>
@@ -35,7 +35,7 @@ export function Slider({
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="accent-sky-400"
+        className="accent-blue-500"
       />
     </label>
   );
@@ -52,12 +52,12 @@ export function Toggle({
 }) {
   return (
     <label className="flex cursor-pointer items-center justify-between">
-      <span className="text-slate-300">{label}</span>
+      <span className="text-zinc-300">{label}</span>
       <input
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="accent-sky-400"
+        className="accent-blue-400"
       />
     </label>
   );
@@ -73,15 +73,15 @@ export function Tabs<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="flex gap-1 rounded-lg bg-slate-900 p-1">
+    <div className="flex gap-1 rounded-xl bg-zinc-950 p-1 ring-1 ring-white/5">
       {options.map((o) => (
         <button
           key={o}
           onClick={() => onChange(o)}
-          className={`flex-1 rounded-md px-2 py-1 capitalize transition ${
+          className={`flex-1 rounded-lg px-2 py-1 capitalize transition ${
             value === o
-              ? 'bg-emerald-500/90 font-medium text-slate-950'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'bg-blue-500 font-medium text-white'
+              : 'text-zinc-400 hover:text-zinc-200'
           }`}
         >
           {o}
@@ -94,7 +94,7 @@ export function Tabs<T extends string>({
 export function Section({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
+      <span className="text-[10px] font-semibold tracking-wider text-zinc-500 uppercase">
         {label}
       </span>
       {children}

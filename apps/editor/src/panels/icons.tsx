@@ -100,3 +100,23 @@ export const IconScript = () => (
     <path d="M9 12h7M9 16h5" />
   </svg>
 );
+
+export const IconScissors = () => (
+  <svg {...base}>
+    <circle cx="6" cy="6" r="3" />
+    <circle cx="6" cy="18" r="3" />
+    <path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12" />
+  </svg>
+);
+
+export const IconTrash = () => (
+  <svg {...base}>
+    <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
+  </svg>
+);
+
+export const IconFit = () => (
+  <svg {...base}>
+    <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+  </svg>
+);

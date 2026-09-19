@@ -50,7 +50,7 @@ export default function CaptionsPanel({
           <button
             onClick={add}
             disabled={captionSlotAt(captions, timeMs, duration) === null}
-            className="flex-1 rounded-lg bg-slate-800 py-2 text-slate-200 hover:bg-slate-700 disabled:opacity-40"
+            className="flex-1 rounded-lg bg-zinc-800 py-2 text-zinc-200 hover:bg-zinc-700 disabled:opacity-40"
           >
             + At playhead
           </button>
@@ -60,14 +60,14 @@ export default function CaptionsPanel({
               onSelect(null);
             }}
             title="One cue per click, using the element text the extension recorded"
-            className="flex-1 rounded-lg bg-slate-800 py-2 text-slate-200 hover:bg-slate-700"
+            className="flex-1 rounded-lg bg-zinc-800 py-2 text-zinc-200 hover:bg-zinc-700"
           >
             From clicks
           </button>
         </div>
 
         {captions.length === 0 && (
-          <p className="text-[11px] leading-relaxed text-slate-500">
+          <p className="text-[11px] leading-relaxed text-zinc-500">
             No captions yet. “From clicks” drafts one per click from the element text already in
             the log — no AI involved.
           </p>
@@ -80,7 +80,7 @@ export default function CaptionsPanel({
             value={cue.text}
             rows={3}
             onChange={(e) => setCaptions(setCaptionText(captions, selected, e.target.value))}
-            className="w-full resize-none rounded-lg border border-slate-700 bg-slate-900 p-2 text-slate-100 outline-none focus:border-sky-500"
+            className="w-full resize-none rounded-lg border border-zinc-700 bg-zinc-900 p-2 text-zinc-100 outline-none focus:border-blue-500"
           />
           <button
             onClick={() => {
@@ -96,15 +96,15 @@ export default function CaptionsPanel({
 
       {captions.length > 0 && (
         <Section label="Style">
-          <div className="flex gap-1 rounded-lg bg-slate-900 p-1">
+          <div className="flex gap-1 rounded-lg bg-zinc-900 p-1">
             {(['top', 'bottom'] as const).map((p) => (
               <button
                 key={p}
                 onClick={() => setCs({ position: p })}
                 className={`flex-1 rounded-md py-1 capitalize ${
                   cs.position === p
-                    ? 'bg-emerald-500/90 font-medium text-slate-950'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-blue-500 font-medium text-white'
+                    : 'text-zinc-400 hover:text-zinc-200'
                 }`}
               >
                 {p}
@@ -121,21 +121,21 @@ export default function CaptionsPanel({
             format={(v) => `${Math.round(v * 1000) / 10}%`}
           />
           <label className="flex items-center justify-between">
-            <span className="text-slate-400">Text colour</span>
+            <span className="text-zinc-400">Text colour</span>
             <input
               type="color"
               value={cs.color}
               onChange={(e) => setCs({ color: e.target.value })}
-              className="h-7 w-12 rounded border border-slate-700 bg-transparent"
+              className="h-7 w-12 rounded border border-zinc-700 bg-transparent"
             />
           </label>
           <label className="flex items-center justify-between">
-            <span className="text-slate-400">Plate behind text</span>
+            <span className="text-zinc-400">Plate behind text</span>
             <input
               type="checkbox"
               checked={cs.background !== ''}
               onChange={(e) => setCs({ background: e.target.checked ? 'rgba(2,6,23,0.72)' : '' })}
-              className="accent-sky-400"
+              className="accent-blue-400"
             />
           </label>
         </Section>
