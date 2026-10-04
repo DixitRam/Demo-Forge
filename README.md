@@ -1,34 +1,56 @@
 # DemoForge
 
-Turns a screen recording of a web app into a polished demo video, with
-automatic zoom on every click. Phase 1: record → click log → auto-zoom →
-framed background → MP4. No AI, no Playwright, no backend.
+Product demo videos from a script. Write the flow once as Playwright steps with
+a line of narration on each; DemoForge drives the app, records it, zooms in on
+every click, draws a smooth cursor, speaks the narration and exports an MP4.
+When the UI changes, run the same command again.
 
-See `demoforge-docs/` for the product vision and the binding architecture
-contract.
+![Auto-zoom on a click](demoforge-docs/demo.gif)
+
+- **Auto-zoom from the click log**, not computer vision — the browser already
+  knows where you clicked.
+- **Synthetic cursor** with natural motion, since Playwright never moves a real one.
+- **Narration**: local espeak-ng, or Gemini / ElevenLabs / Mistral with a key.
+  The recorder holds each step until its line has been said.
+- **Editor** in the browser: drag zooms, cut, captions, background, then export.
+- A **Chrome extension** for recording by hand, feeding the same editor.
+
+## Quick start
+
+Needs Node, pnpm and ffmpeg. espeak-ng (`dnf install espeak-ng` /
+`apt install espeak-ng`) gives you a free local voice; no API key needed.
+
+```sh
+pnpm install
+pnpm -C packages/core build
+pnpm exec playwright-core install chromium
+
+node scripts/demoforge.mjs record demos/todomvc/flow.json   # drive the app, record
+node scripts/demoforge.mjs open   demos/todomvc             # review in the editor
+node scripts/demoforge.mjs export demos/todomvc             # -> demos/todomvc/demo.mp4
+```
+
+`demos/todomvc/flow.json` records Playwright's public TodoMVC demo — copy it
+and point `url` at your own app.
 
 ## Layout
 
 ```
 packages/core       @demoforge/core — types, zoom planner, evaluator, cursor path
-apps/extension      MV3 Chrome extension (MIT, from scratch) — capture + click log
 apps/editor         Vite + React + Tailwind — player, timeline, compositor, export
-scripts/            make-fixture.sh — synthetic bundle with known coordinates
+apps/extension      MV3 Chrome extension — capture by hand + click log
+scripts/            demoforge.mjs — the record / open / export CLI
 ```
 
-## Getting started
+`pnpm -r test` runs the tests. `demoforge-docs/` has the product vision and
+architecture notes.
 
-```sh
-pnpm install
-pnpm -r test                  # 213 tests
-pnpm -C apps/extension build  # then load apps/extension/dist unpacked in Chrome
-pnpm -C apps/editor dev
-```
+## Voices
 
 Narration needs a voice provider; nothing else does, and the editor tells you
 which ones are available.
 
-- **espeak-ng (local)** — `dnf install espeak-ng`. Free, offline, robotic.
+- **espeak-ng (local)** — free, offline, robotic.
 - **Gemini AI** — copy `.env.example` to `.env` and put a key in
   `GEMINI_API_KEY`. The same key writes the script. Sounds like a person. `.env` at the repo root or in
   `apps/editor/` both work; the key is read by the dev server only and never
@@ -42,16 +64,19 @@ which ones are available.
   use only, and asks you to credit ElevenLabs. The panel shows what is left
   and what the next generate will cost, and warns before a run that would run
   out partway.
+- **Mistral Voxtral** — `MISTRAL_API_KEY`, same two locations.
 
-## The workflow
+## Recording by hand (extension)
 
-1. **Record.** Load the extension, open any `http(s)` page, click the DemoForge
-   action → Start. It captures the tab with `chrome.tabCapture` and logs every
-   click, input, scroll and navigation against the recorder's own clock.
+1. **Record.** `pnpm -C apps/extension build`, load `apps/extension/dist`
+   unpacked in Chrome, open any `http(s)` page, click the DemoForge action →
+   Start. It captures the tab with `chrome.tabCapture` and logs every click,
+   input, scroll and navigation against the recorder's own clock.
 2. **Stop.** Two files land in `~/Downloads/demoforge/<timestamp>/`:
    `recording.webm` and `demo.json` (a `DemoRecording`).
-3. **Edit.** Drop both into the editor. Zooms are planned from the click log;
-   drag the pills to move or resize them, add and delete, restyle the frame.
+3. **Edit.** `pnpm -C apps/editor dev` and drop both into the editor. Zooms are
+   planned from the click log; drag the pills to move or resize them, add and
+   delete, restyle the frame.
 4. **Export.** Render to MP4. With the dev server running this uses native
    ffmpeg (`apps/editor/vite-export.ts`): the recording is decoded straight
    through, each frame drawn by the editor's own `compose()` on a Skia canvas,

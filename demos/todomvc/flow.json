@@ -1,0 +1,20 @@
+{
+  "url": "https://demo.playwright.dev",
+  "start": "/todomvc/",
+  "viewport": [1280, 800],
+  "brief": "TodoMVC is a simple to-do list app. This demo plans a product launch: add three tasks, tick one off, and filter the list.",
+  "steps": [
+    { "wait": 600, "say": "Let's plan a product launch with a simple to-do list." },
+    { "fill": "[placeholder='What needs to be done?']", "text": "Record the demo video", "say": "Type a task in the box at the top." },
+    { "press": "Enter", "say": "Enter adds it to the list." },
+    { "fill": "[placeholder='What needs to be done?']", "text": "Write the release notes" },
+    { "press": "Enter" },
+    { "fill": "[placeholder='What needs to be done?']", "text": "Ship it" },
+    { "press": "Enter", "say": "Add the rest the same way." },
+    { "click": ".todo-list li >> nth=0 >> .toggle", "say": "Tick the circle once a task is done." },
+    { "click": "role=link[name='Active']", "say": "Active shows only what's left to do." },
+    { "click": "role=link[name='Completed']", "say": "Completed shows what you've finished." },
+    { "click": "role=button[name='Clear completed']", "say": "Clear completed tidies the list." },
+    { "click": "role=link[name='All']", "pause": 1200, "say": "Two tasks to go. Let's ship it." }
+  ]
+}
