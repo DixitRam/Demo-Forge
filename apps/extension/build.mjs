@@ -27,6 +27,7 @@ const builds = [
 async function copyStatic() {
   await mkdir(`${out}/popup`, { recursive: true });
   await cp('manifest.json', `${out}/manifest.json`);
+  await cp('icons', `${out}/icons`, { recursive: true });
   await cp('src/offscreen.html', `${out}/offscreen.html`);
   await cp('src/popup/popup.html', `${out}/popup/popup.html`);
   await cp('src/popup/popup.css', `${out}/popup/popup.css`);
