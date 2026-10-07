@@ -644,7 +644,7 @@ async function cmdOpen(dir) {
 const [command, dir] = process.argv.slice(2);
 if (!command || !dir || !existsSync(dir)) {
   die(
-    'usage: demoforge <record|open|steps|write|show> <recording-dir> [options]\n' +
+    'usage: demoforge <record|open|export|steps|write|show> <recording-dir> [options]\n' +
       '  record <demos/name/flow.json> [--headed]\n' +
       '                                     run the flow, capture video + log + script beside it\n' +
       '  open   [--no-browser]              load the take in the editor (starts it if needed)\n' +
