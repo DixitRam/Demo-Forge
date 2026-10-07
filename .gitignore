@@ -8,7 +8,15 @@ dist/
 .env.*
 !.env.example
 
-# Recorded takes: keep the flow, regenerate the rest.
+# Recorded takes: keep the flow, regenerate the rest (renders included).
 demos/*/*
 !demos/*/flow.json
+demos/*.mp4
 demos/.editor.log
+
+# Private launch drafts and the retired hero GIF (README uses docs/assets/ now).
+demoforge-docs/outreach/
+demoforge-docs/demo.gif
+
+# /brag renders (the README picks its asset from here by hand)
+brag-output*/
