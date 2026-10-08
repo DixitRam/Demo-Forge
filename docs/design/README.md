@@ -1,13 +1,20 @@
-# DemoForge — Start Here
+# DemoForge — design docs
 
-> **If you are Claude Code reading this cold: read the docs in this order.**
-> 1. `00_README_START_HERE.md` (this file) — what we're building and why
-> 2. `01_PRODUCT_VISION.md` — full product, all 3 phases, competitor analysis
-> 3. `02_ARCHITECTURE.md` — the technical spine that makes all phases work
-> 4. `03_PHASE1_BUILD.md` — **the only thing to build right now**
-> 5. `04_PHASE2_PREVIEW.md` — AI voiceover/transcript (context only, do NOT build)
-> 6. `05_PHASE3_PREVIEW.md` — Playwright re-record (context only, do NOT build)
-> 7. `06_GLOSSARY_AND_DECISIONS.md` — terms + why we chose what we chose
+> **These are DemoForge's original design docs**, written before the code to plan
+> it in three phases: the editor (Phase 1), AI voiceover (Phase 2) and
+> Playwright re-recording (Phase 3). All three have since shipped, so the
+> "build only Phase 1" framing inside them is historical. They are kept for the
+> reasoning: why auto-zoom comes from the click log, why everything flows
+> through one `DemoRecording` type, and the trade-offs behind each choice. For
+> how DemoForge works today, start with the [main README](../../README.md) and
+> [docs/](../).
+>
+> 1. [Product vision](01_PRODUCT_VISION.md): the product across all three phases, competitors
+> 2. [Architecture](02_ARCHITECTURE.md): the technical spine every phase shares
+> 3. [Phase 1 build](03_PHASE1_BUILD.md): the editor
+> 4. [Phase 2 preview](04_PHASE2_PREVIEW.md): AI voiceover and transcript
+> 5. [Phase 3 preview](05_PHASE3_PREVIEW.md): Playwright re-record
+> 6. [Glossary and decisions](06_GLOSSARY_AND_DECISIONS.md): terms, and why we chose what we chose
 
 ---
 

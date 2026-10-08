@@ -2,6 +2,28 @@
   "name": "demoforge",
   "private": true,
   "version": "0.1.0",
+  "description": "Product demo videos from a script: Playwright drives your app, DemoForge zooms on every click, narrates it, and exports an MP4.",
+  "keywords": [
+    "demo-video",
+    "product-demo",
+    "playwright",
+    "screen-recording",
+    "auto-zoom",
+    "voiceover",
+    "video-editor"
+  ],
+  "homepage": "https://github.com/DixitRam/Demo-Forge#readme",
+  "bugs": {
+    "url": "https://github.com/DixitRam/Demo-Forge/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DixitRam/Demo-Forge.git"
+  },
+  "engines": {
+    "node": ">=20.19",
+    "pnpm": ">=10"
+  },
   "license": "MIT",
   "packageManager": "pnpm@11.22.0",
   "scripts": {

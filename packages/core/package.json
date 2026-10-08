@@ -1,6 +1,12 @@
 {
   "name": "@demoforge/core",
   "version": "0.1.0",
+  "description": "DemoForge core: the DemoRecording types, zoom planner, cursor path and the .dfp.json project format.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DixitRam/Demo-Forge.git",
+    "directory": "packages/core"
+  },
   "license": "MIT",
   "type": "module",
   "main": "./src/index.ts",

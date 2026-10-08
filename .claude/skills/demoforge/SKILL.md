@@ -5,7 +5,10 @@ description: Record a narrated DemoForge demo video of a page in a web app ("rec
 
 # Recording a demo with DemoForge
 
-DemoForge lives at `/home/dixit/Projects/Demo Forge` (call it `$DF`). Everything
+`$DF` is the root of the DemoForge checkout: the repo that contains this skill
+at `.claude/skills/demoforge/` (so `$DF` is two levels above this file's folder;
+when the skill is symlinked into `~/.claude/skills/`, resolve the link). Quote
+it, since checkouts often live under paths with spaces. Everything
 goes through its CLI, `node "$DF/scripts/demoforge.mjs"`. Takes live in
 `$DF/demos/<name>/`; `flow.json` is the only file there you write by hand.
 
