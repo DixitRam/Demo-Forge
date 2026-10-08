@@ -1,6 +1,7 @@
 {
   "name": "@demoforge/extension",
   "version": "0.1.0",
+  "description": "DemoForge recorder: a Chrome extension that captures a tab plus its click log.",
   "license": "MIT",
   "private": true,
   "type": "module",

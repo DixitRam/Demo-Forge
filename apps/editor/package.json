@@ -1,6 +1,7 @@
 {
   "name": "@demoforge/editor",
   "version": "0.1.0",
+  "description": "DemoForge editor: player, timeline, compositor, voiceover and MP4 export.",
   "license": "MIT",
   "private": true,
   "type": "module",
