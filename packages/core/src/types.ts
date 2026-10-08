@@ -2,7 +2,7 @@
  * The central contract. Everything flows through DemoRecording.
  *
  * Defined ONCE here; imported by the extension, the editor, and (Phase 3)
- * the Playwright capture. See demoforge-docs/02_ARCHITECTURE.md.
+ * the Playwright capture. See docs/design/02_ARCHITECTURE.md.
  *
  * THE RULE: no code downstream of DemoRecording may read `source` to change
  * behaviour. If you feel tempted to write `if (rec.source === ...)`, stop —
