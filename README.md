@@ -14,6 +14,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/DixitRam/Demo-Forge/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/DixitRam/Demo-Forge/ci.yml?branch=main&style=flat-square&label=CI" alt="CI status" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT license" /></a>
   <img src="https://img.shields.io/badge/node-20.19%2B-339933?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node 20.19+" />
   <img src="https://img.shields.io/badge/recorded%20with-Playwright-2EAD33?style=flat-square&logo=playwright&logoColor=white" alt="Recorded with Playwright" />
@@ -64,13 +65,19 @@ pnpm install
 pnpm -C packages/core build
 pnpm exec playwright-core install chromium
 
-node scripts/demoforge.mjs record demos/todomvc/flow.json   # drive the app and record
-node scripts/demoforge.mjs open   demos/todomvc             # review in the editor
-node scripts/demoforge.mjs export demos/todomvc             # -> demos/todomvc/demo.mp4
+node scripts/demoforge.mjs record demos/todomvc/flow.json   # drive the app, record, write the script
+node scripts/demoforge.mjs open   demos/todomvc             # open the take in the editor
 ```
+
+In the editor, open **Script & voice** and press **Generate voiceover**, then
+**Export**. You get an MP4 with the zooms, the cursor and the narration.
 
 This records Playwright's public TodoMVC demo. To demo your own app, copy
 `demos/todomvc/flow.json` and point `url` at it.
+
+`node scripts/demoforge.mjs export demos/todomvc` renders the same MP4 from the
+command line, for scripts and CI. It is silent unless the take folder already
+holds a narration `.wav`.
 
 ## How it works
 
@@ -111,7 +118,7 @@ The flow is the only file you commit. When the UI changes, run `record` again.
 | [Narration and voices](docs/narration.md) | AI-written scripts, voice providers and API keys, how the voiceover is mixed |
 | [The project file](docs/project-format.md) | The `.dfp.json` format, for scripts and agents that edit projects |
 | [Architecture](docs/architecture.md) | The design contract, how to verify it, known limits |
-| [Design notes](demoforge-docs/00_README_START_HERE.md) | Product vision and the reasoning behind it |
+| [Design docs](docs/design/README.md) | The original product vision and the reasoning behind the architecture |
 
 ## Project layout
 
