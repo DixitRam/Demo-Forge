@@ -79,6 +79,27 @@ This records Playwright's public TodoMVC demo. To demo your own app, copy
 command line, for scripts and CI. It is silent unless the take folder already
 holds a narration `.wav`.
 
+## Use it from Claude Code (or any coding agent)
+
+<p align="center">
+  <a href="docs/assets/howto-claude-code.mp4">
+    <img src="docs/assets/howto-claude-code.jpg" alt="How to use DemoForge in Claude Code — tutorial video (1:16)" width="100%" />
+  </a>
+  <br />
+  <sub>▶ Watch the tutorial (1:16, narrated)</sub>
+</p>
+
+1. **Set up once.** Follow the quick start above.
+2. **Give Claude the skill.** It ships in `.claude/skills/demoforge/`. To use it
+   from any repo, symlink it:
+   `ln -s "$PWD/.claude/skills/demoforge" ~/.claude/skills/demoforge`
+3. **Ask for a demo.** With your app running, tell Claude Code "record a demo of
+   the todo app". It reads the page, writes the flow, records it and checks
+   every frame.
+4. **Review.** The take opens in the editor. Pick a voice and press
+   **Generate voiceover**.
+5. **Export.** Press **Export**, then **Render**.
+
 ## How it works
 
 A demo is a `flow.json`: Playwright steps, each with an optional line of
