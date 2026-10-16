@@ -81,13 +81,9 @@ holds a narration `.wav`.
 
 ## Use it from Claude Code (or any coding agent)
 
-<p align="center">
-  <a href="docs/assets/howto-claude-code.mp4">
-    <img src="docs/assets/howto-claude-code.jpg" alt="How to use DemoForge in Claude Code — tutorial video (1:16)" width="100%" />
-  </a>
-  <br />
-  <sub>▶ Watch the tutorial (1:16, narrated)</sub>
-</p>
+
+https://github.com/user-attachments/assets/51057caf-827d-47bd-9e79-47ec43f30d6e
+
 
 1. **Set up once.** Follow the quick start above.
 2. **Give Claude the skill.** It ships in `.claude/skills/demoforge/`. To use it
